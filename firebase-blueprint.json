@@ -1,0 +1,113 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "timestamp" },
+        "role": { "type": "string", "enum": ["admin", "user"] }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "TCG Product for Leaderboard",
+      "type": "object",
+      "properties": {
+        "card_id": { "type": "string" },
+        "rank": { "type": "number" },
+        "name_zh": { "type": "string" },
+        "name_jp": { "type": "string" },
+        "card_number": { "type": "string" },
+        "set_name": { "type": "string" },
+        "image_url": { "type": "string" },
+        "market_data": {
+          "type": "object",
+          "properties": {
+            "snkrdunk_price": { "type": "number" },
+            "ebay_price": { "type": "number" },
+            "change_24h": { "type": "string" },
+            "status": { "type": "string" }
+          }
+        }
+      },
+      "required": ["rank", "name_zh", "image_url"]
+    },
+    "Listing": {
+      "title": "Listing",
+      "description": "Card listing for sale",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "englishName": { "type": "string" },
+        "description": { "type": "string" },
+        "condition": { "type": "string" },
+        "cardType": { "type": "string" },
+        "price": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "imageUrls": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "sellerPhoto": { "type": "string" },
+        "sellerRating": { "type": "number" },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["title", "price", "status", "sellerId"]
+    },
+    "WantListing": {
+      "title": "WantListing",
+      "description": "Card wanted by user",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "englishName": { "type": "string" },
+        "condition": { "type": "string" },
+        "cardType": { "type": "string" },
+        "targetPrice": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhoto": { "type": "string" },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["title", "targetPrice", "userId"]
+    },
+    "Article": {
+      "title": "Article",
+      "description": "Article data",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "imageUrl": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profiles"
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Products for leaderboard"
+    },
+    "/listings/{listingId}": {
+      "schema": { "$ref": "#/entities/Listing" },
+      "description": "Listings for sale"
+    },
+    "/wantListings/{wantId}": {
+      "schema": { "$ref": "#/entities/WantListing" },
+      "description": "Want listings"
+    },
+    "/articles/{articleId}": {
+      "schema": { "$ref": "#/entities/Article" },
+      "description": "Articles"
+    }
+  }
+}

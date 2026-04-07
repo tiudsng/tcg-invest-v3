@@ -50,9 +50,9 @@ const FeaturedArticle = ({ article, isLarge = false, onEdit }: { article: any, i
   const isAdmin = user?.role === 'admin';
 
   return (
-    <div className="group relative block w-full bg-white dark:bg-[#1c1c1e] rounded-[1.25rem] sm:rounded-[1.5rem] overflow-hidden border border-gray-100 dark:border-white/5 transition-all duration-300 hover:border-gray-200 dark:border-white/10">
+    <div className="group relative block w-full bg-[#1c1c1e] rounded-[1.25rem] sm:rounded-[1.5rem] overflow-hidden border border-white/5 transition-all duration-300 hover:border-white/10">
       <Link to={`/article/${article.id}`} className="absolute inset-0 z-10" aria-label={`閱讀 ${article.title}`} />
-      <div className={`relative ${isLarge ? 'h-48 sm:h-64' : 'h-32 sm:h-40'} overflow-hidden z-0`}>
+      <div className={`relative ${isLarge ? 'aspect-[2/1] sm:aspect-[21/9]' : 'aspect-[4/3] sm:aspect-[3/2]'} overflow-hidden z-0`}>
         <img 
           src={article.imageUrl} 
           alt={article.title} 
@@ -61,14 +61,17 @@ const FeaturedArticle = ({ article, isLarge = false, onEdit }: { article: any, i
           loading="lazy"
           decoding="async"
         />
-        {isLarge && (
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-        )}
       </div>
-      <div className="p-3 sm:p-5 relative z-0 pointer-events-none">
-        <h3 className={`${isLarge ? 'text-base sm:text-xl' : 'text-[13px] sm:text-base'} font-bold text-gray-900 dark:text-white line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-tight sm:leading-normal`}>
+      <div className="p-3 sm:p-4 relative z-0 pointer-events-none flex flex-col justify-center">
+        <h3 className={`${isLarge ? 'text-base sm:text-xl' : 'text-[13px] sm:text-base'} font-bold text-white line-clamp-2 group-hover:text-blue-400 transition-colors leading-tight sm:leading-normal mb-1.5`}>
           {article.title}
         </h3>
+        {article.readTime && (
+          <div className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-400">
+            <Clock className="w-3 h-3" />
+            <span>{article.readTime}</span>
+          </div>
+        )}
       </div>
       {isAdmin && (
         <button
@@ -101,7 +104,7 @@ const ListArticle = ({ article, onEdit }: { article: any, onEdit?: (id: string, 
   const isAdmin = user?.role === 'admin';
 
   return (
-    <div className="group relative block w-full bg-white dark:bg-[#1c1c1e] rounded-[1.25rem] sm:rounded-[1.5rem] overflow-hidden border border-gray-100 dark:border-white/5 p-2.5 sm:p-3 transition-all duration-300 hover:border-gray-200 dark:border-white/10">
+    <div className="group relative block w-full bg-[#1c1c1e] rounded-[1.25rem] sm:rounded-[1.5rem] overflow-hidden border border-white/5 p-2.5 sm:p-3 transition-all duration-300 hover:border-white/10">
       <Link to={`/article/${article.id}`} className="absolute inset-0 z-10" aria-label={`閱讀 ${article.title}`} />
       <div className="flex gap-3 sm:gap-4 relative z-0 pointer-events-none">
         <div className="relative w-20 h-20 sm:w-28 sm:h-28 rounded-xl overflow-hidden shrink-0">
@@ -112,10 +115,21 @@ const ListArticle = ({ article, onEdit }: { article: any, onEdit?: (id: string, 
             referrerPolicy="no-referrer"
           />
         </div>
-        <div className="flex flex-col justify-center py-0.5">
-          <h3 className="text-[13px] sm:text-base font-bold text-gray-900 dark:text-white line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-snug">
+        <div className="flex flex-col justify-center py-0.5 flex-1">
+          {article.date && (
+            <div className="flex items-center gap-1 text-[10px] sm:text-xs text-gray-400 mb-1">
+              <Clock className="w-3 h-3" />
+              <span>{article.date}</span>
+            </div>
+          )}
+          <h3 className="text-[13px] sm:text-base font-bold text-white line-clamp-2 group-hover:text-blue-400 transition-colors leading-snug mb-1">
             {article.title}
           </h3>
+          {article.readTime && (
+            <div className="text-[10px] sm:text-xs text-gray-500">
+              {article.readTime}
+            </div>
+          )}
         </div>
       </div>
       {isAdmin && (
@@ -484,14 +498,14 @@ export const Home: React.FC = () => {
       <div className="mb-12 sm:mb-16">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400 fill-blue-600 dark:fill-blue-400" />
-            TCG 情報區
+            <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-gray-900 dark:text-white" />
+            收藏家指南
           </h2>
           <Link to="/articles" className="text-sm sm:text-base text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
             查看全部 <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {loading ? (
             [...Array(3)].map((_, i) => <ArticleSkeleton key={i} />)
           ) : (

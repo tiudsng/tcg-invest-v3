@@ -102,24 +102,33 @@ export const BottomNav = () => {
         )}
       </AnimatePresence>
 
-      <div className="relative bg-white/90 dark:bg-[#0a0a0a]/90 backdrop-blur-3xl border-t border-gray-100 dark:border-white/10 px-2 pb-safe">
-        <div className="max-w-md mx-auto flex items-center justify-between h-16">
+      <div className="relative px-4 pb-safe">
+        {/* The Main Nav Container with Glassmorphism */}
+        <div className="relative max-w-md mx-auto h-16 bg-white/80 dark:bg-[#0d0d0d]/90 backdrop-blur-2xl border border-gray-100/50 dark:border-white/5 rounded-[2rem] shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-between px-2 mb-2">
+          
           {navItems.map((item, idx) => {
             if (!item.icon) {
               return (
-                <div key={idx} className="relative w-16 h-16 -mt-8">
+                <div key={idx} className="relative w-16 h-full flex items-center justify-center">
+                  {/* Floating FAB */}
                   <button
                     onClick={() => setShowFabMenu(!showFabMenu)}
                     className={cn(
-                      "absolute top-0 left-1/2 -translate-x-1/2 w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-xl active:scale-90 z-10",
+                      "absolute -top-8 w-14 h-14 rounded-full flex items-center justify-center transition-all duration-500 shadow-[0_8px_24px_rgba(24,104,246,0.4)] active:scale-90 z-20",
                       showFabMenu 
                         ? "bg-white text-black rotate-45" 
-                        : "bg-blue-600 text-white shadow-blue-600/40"
+                        : "bg-gradient-to-br from-[#1868f6] to-[#0047cc] text-white"
                     )}
                   >
                     <Plus className={cn("w-8 h-8 transition-transform duration-500", showFabMenu && "rotate-0")} />
                   </button>
-                  <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-20 h-10 bg-white/90 dark:bg-[#0a0a0a]/90 rounded-b-full -z-0" />
+                  
+                  {/* Organic Notch Background (SVG for perfect curves) */}
+                  <div className="absolute -top-[33px] w-[88px] h-[44px] -z-10 pointer-events-none">
+                    <svg viewBox="0 0 88 44" className="w-full h-full fill-white/80 dark:fill-[#0d0d0d]/90 backdrop-blur-2xl">
+                      <path d="M0 44C0 44 10 44 14 44C22 44 24 38 28 30C32 22 36 12 44 12C52 12 56 22 60 30C64 38 66 44 74 44C78 44 88 44 88 44V0H0V44Z" transform="rotate(180 44 22)" />
+                    </svg>
+                  </div>
                 </div>
               );
             }
@@ -129,21 +138,31 @@ export const BottomNav = () => {
               <button
                 key={idx}
                 onClick={() => navigate(item.path)}
-                className="flex flex-col items-center justify-center flex-1 h-full gap-1 group"
+                className="flex flex-col items-center justify-center flex-1 h-full gap-1 group relative"
               >
-                <item.icon 
+                <motion.div 
+                  animate={isActive ? { scale: 1.1 } : { scale: 1 }}
                   className={cn(
-                    "w-5 h-5 transition-all duration-300",
-                    isActive 
-                    ? "text-blue-600 dark:text-blue-400 scale-110" 
-                    : "text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200"
-                  )} 
-                />
+                    "p-2 rounded-2xl transition-all duration-300",
+                    isActive ? "text-[#1868f6] dark:text-blue-400" : "text-gray-400 dark:text-gray-500 group-hover:text-gray-900 dark:group-hover:text-gray-200"
+                  )}
+                >
+                  <item.icon 
+                    className="w-5 h-5" 
+                    strokeWidth={isActive ? 2.5 : 2}
+                  />
+                  {isActive && (
+                    <motion.div 
+                      layoutId="nav-glow"
+                      className="absolute inset-0 bg-blue-500/10 dark:bg-blue-400/10 rounded-2xl -z-10"
+                    />
+                  )}
+                </motion.div>
                 <span className={cn(
-                  "text-[10px] font-bold transition-all duration-300",
+                  "text-[10px] font-bold transition-all duration-300 tracking-tight",
                   isActive 
-                    ? "text-blue-600 dark:text-blue-400" 
-                    : "text-gray-400"
+                    ? "text-[#1868f6] dark:text-blue-400 opacity-100" 
+                    : "text-gray-400 dark:text-gray-500 opacity-80"
                 )}>
                   {item.label}
                 </span>
