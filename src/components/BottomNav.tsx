@@ -122,13 +122,6 @@ export const BottomNav = () => {
                   >
                     <Plus className={cn("w-8 h-8 transition-transform duration-500", showFabMenu && "rotate-0")} />
                   </button>
-                  
-                  {/* Organic Notch Background (SVG for perfect curves) */}
-                  <div className="absolute -top-[33px] w-[88px] h-[44px] -z-10 pointer-events-none">
-                    <svg viewBox="0 0 88 44" className="w-full h-full fill-white/80 dark:fill-[#0d0d0d]/90 backdrop-blur-2xl">
-                      <path d="M0 44C0 44 10 44 14 44C22 44 24 38 28 30C32 22 36 12 44 12C52 12 56 22 60 30C64 38 66 44 74 44C78 44 88 44 88 44V0H0V44Z" transform="rotate(180 44 22)" />
-                    </svg>
-                  </div>
                 </div>
               );
             }

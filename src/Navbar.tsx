@@ -80,33 +80,34 @@ export const Navbar: React.FC = () => {
       <motion.nav 
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className="fixed top-0 left-0 right-0 z-40 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/10 supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-black/60"
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="fixed top-0 left-0 right-0 z-40 bg-white/70 dark:bg-black/70 backdrop-blur-2xl border-b border-black/5 dark:border-white/10 supports-[backdrop-filter]:bg-white/50 dark:supports-[backdrop-filter]:bg-black/50"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16 sm:h-20">
-            <div className="flex items-center gap-2">
+        <div className="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-12">
+          <div className="flex justify-between items-center h-20 sm:h-24">
+            <div className="flex items-center gap-4">
               {isDetailView && (
                 <button
                   onClick={handleBack}
-                  className="lg:hidden p-2 -ml-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-all active:scale-90"
+                  className="lg:hidden p-2.5 -ml-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-all active:scale-90"
                 >
-                  <ChevronLeft className="w-6 h-6" />
+                  <ChevronLeft className="w-7 h-7" />
                 </button>
               )}
-              <Link to="/" className="flex items-center gap-3 group">
-                <div className="relative w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform duration-300">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 sm:w-6 sm:h-6">
+              <Link to="/" className="flex items-center gap-4 group">
+                <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-xl shadow-blue-500/20 group-hover:scale-110 transition-all duration-500">
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 sm:w-7 sm:h-7">
                     <rect x="2" y="9" width="10" height="13" rx="1.5" className="fill-white/20 stroke-white/50" strokeWidth="1" />
                     <rect x="6" y="5.5" width="10" height="13" rx="1.5" className="fill-white/40 stroke-white/70" strokeWidth="1" />
                     <rect x="10" y="2" width="10" height="13" rx="1.5" className="fill-white stroke-white" strokeWidth="1.2" />
                     <path d="M18.5 3.5L19 5L20.5 5.5L19 6L18.5 7.5L18 6L16.5 5.5L18 5L18.5 3.5Z" fill="#3b82f6" className="animate-pulse origin-center" />
                   </svg>
                 </div>
-                <span className="font-black text-lg sm:text-xl tracking-tighter text-gray-900 dark:text-white italic hidden sm:block">TCG INVEST</span>
+                <span className="font-semibold text-xl sm:text-2xl tracking-tight text-gray-900 dark:text-white italic hidden sm:block">TCG INVEST</span>
               </Link>
             </div>
 
-            <div className="hidden lg:flex items-center gap-1 bg-gray-100/50 dark:bg-white/5 p-1.5 rounded-2xl border border-gray-200/50 dark:border-white/5">
+            <div className="hidden lg:flex items-center gap-2 bg-gray-100/50 dark:bg-white/5 p-2 rounded-[1.25rem] border border-gray-200/50 dark:border-white/5">
               {navLinks.map((link) => {
                 const active = isActive(link.path);
                 const Icon = link.icon;
@@ -115,19 +116,19 @@ export const Navbar: React.FC = () => {
                     key={link.path}
                     to={link.path}
                     onClick={link.protected ? handleProtectedAction : undefined}
-                    className={`relative px-3 xl:px-4 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 ${
-                      active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/50 dark:hover:bg-white/5'
+                    className={`relative px-4 xl:px-6 py-2.5 rounded-xl text-sm xl:text-base font-semibold tracking-tight transition-all flex items-center gap-2.5 ${
+                      active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10'
                     }`}
                   >
                     {active && (
                       <motion.div
                         layoutId="desktop-nav-active"
-                        className="absolute inset-0 bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm border border-gray-200/50 dark:border-white/5"
+                        className="absolute inset-0 bg-white dark:bg-[#1a1a1a] rounded-xl shadow-md border border-gray-200/50 dark:border-white/5"
                         transition={{ type: "spring", stiffness: 400, damping: 30 }}
                       />
                     )}
-                    <span className="relative z-10 flex items-center gap-1.5 xl:gap-2">
-                      <Icon className="w-4 h-4" />
+                    <span className="relative z-10 flex items-center gap-2 xl:gap-3">
+                      <Icon className="w-5 h-5" />
                       <span className="hidden xl:inline">{link.label}</span>
                     </span>
                   </Link>
@@ -135,52 +136,52 @@ export const Navbar: React.FC = () => {
               })}
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-6">
               <Link
                 to="/ai-scan"
-                className="p-2 sm:p-2.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-xl transition-all active:scale-95 flex items-center gap-2"
+                className="p-2.5 sm:p-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-2xl transition-all active:scale-95 flex items-center gap-2.5 group"
                 title="AI 卡牌辨識"
               >
-                <Scan className="w-5 h-5" />
-                <span className="hidden sm:inline text-sm font-bold">AI 辨識</span>
+                <Scan className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
+                <span className="hidden sm:inline text-base font-semibold tracking-tight">AI 辨識</span>
               </Link>
               
               <button
                 onClick={toggleTheme}
-                className="p-2 sm:p-2.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-all active:scale-95"
+                className="p-2.5 sm:p-3 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-2xl transition-all active:scale-95"
                 aria-label="Toggle theme"
               >
-                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                {theme === 'light' ? <Moon className="w-6 h-6" /> : <Sun className="w-6 h-6" />}
               </button>
 
-              <div className="hidden sm:block h-6 w-px bg-gray-200 dark:bg-gray-800"></div>
+              <div className="hidden sm:block h-8 w-px bg-gray-200 dark:bg-gray-800"></div>
 
               {user && !user.isGuest ? (
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <Link to="/profile" className="flex items-center gap-3 group p-1 sm:pr-3 bg-transparent sm:bg-gray-50 dark:bg-transparent sm:dark:bg-white/5 rounded-full sm:border border-gray-200/50 dark:border-white/5 hover:border-blue-200 dark:hover:border-blue-500/30 transition-all">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <Link to="/profile" className="flex items-center gap-4 group p-1.5 sm:pr-5 bg-transparent sm:bg-gray-50 dark:bg-transparent sm:dark:bg-white/5 rounded-full sm:border border-gray-200/50 dark:border-white/5 hover:border-blue-200 dark:hover:border-blue-500/30 transition-all shadow-sm">
                     {user.photoURL ? (
-                      <img src={user.photoURL} alt="Profile" className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-700"  referrerPolicy="no-referrer" />
+                      <img src={user.photoURL} alt="Profile" className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-700 shadow-sm"  referrerPolicy="no-referrer" />
                     ) : (
-                      <div className="w-8 h-8 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 rounded-full flex items-center justify-center border border-gray-200 dark:border-gray-700">
-                        <UserIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                      <div className="w-10 h-10 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 rounded-full flex items-center justify-center border border-gray-200 dark:border-gray-700">
+                        <UserIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                       </div>
                     )}
-                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300 hidden sm:block max-w-[100px] truncate">
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 hidden sm:block max-w-[120px] truncate">
                       {user.displayName || 'User'}
                     </span>
                   </Link>
                   <button 
                     onClick={logOut}
-                    className="hidden lg:flex p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all active:scale-95"
+                    className="hidden lg:flex p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-2xl transition-all active:scale-95"
                     title="登出"
                   >
-                    <LogOut className="w-5 h-5" />
+                    <LogOut className="w-6 h-6" />
                   </button>
                 </div>
               ) : (
                 <Link
                   to="/auth"
-                  className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-gray-800 dark:hover:bg-gray-100 transition-all active:scale-95 shadow-sm"
+                  className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-6 py-3 rounded-2xl text-sm font-semibold hover:bg-gray-800 dark:hover:bg-gray-100 transition-all active:scale-95 shadow-xl shadow-black/10 dark:shadow-white/5"
                 >
                   登入 / 註冊
                 </Link>
@@ -215,7 +216,7 @@ export const Navbar: React.FC = () => {
                   <X className="w-5 h-5" />
                 </button>
                 
-                <h3 className="text-xl font-black text-gray-900 dark:text-white mb-6 text-center tracking-tight">選擇發佈類型</h3>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6 text-center tracking-tight">選擇發佈類型</h3>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <Link 
@@ -226,7 +227,7 @@ export const Navbar: React.FC = () => {
                     <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                       <Scan className="w-7 h-7 text-white" />
                     </div>
-                    <span className="font-black text-xl mb-1 tracking-tight">AI 全能發佈</span>
+                    <span className="font-semibold text-xl mb-1 tracking-tight">AI 全能發佈</span>
                     <span className="text-xs font-bold text-blue-100 uppercase tracking-widest">拍照即刻識別並上架</span>
                   </Link>
 
@@ -238,7 +239,7 @@ export const Navbar: React.FC = () => {
                     <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                       <Search className="w-6 h-6 text-white" />
                     </div>
-                    <span className="font-black text-base mb-1 tracking-tight">徵卡區</span>
+                    <span className="font-semibold text-base mb-1 tracking-tight">徵卡區</span>
                     <span className="text-[10px] font-bold text-indigo-100 uppercase tracking-widest">發佈您的徵求</span>
                   </Link>
                   
@@ -250,7 +251,7 @@ export const Navbar: React.FC = () => {
                     <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                       <Camera className="w-6 h-6 text-white" />
                     </div>
-                    <span className="font-black text-base mb-1 tracking-tight">上架賣卡</span>
+                    <span className="font-semibold text-base mb-1 tracking-tight">上架賣卡</span>
                     <span className="text-[10px] font-bold text-blue-100 uppercase tracking-widest">拍下您的收藏</span>
                   </Link>
                 </div>

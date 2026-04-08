@@ -80,12 +80,22 @@
     },
     "Article": {
       "title": "Article",
-      "description": "Article data",
+      "description": "Collector's Guide Article",
       "type": "object",
       "properties": {
         "title": { "type": "string" },
-        "imageUrl": { "type": "string" }
-      }
+        "excerpt": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string" },
+        "readTime": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "featured": { "type": "boolean" },
+        "isList": { "type": "boolean" },
+        "zone": { "type": "number" },
+        "author": { "type": "string" },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["title", "content", "imageUrl"]
     }
   },
   "firestore": {

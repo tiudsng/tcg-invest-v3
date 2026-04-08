@@ -46,7 +46,7 @@ export const CreateWant = () => {
         status: 'active'
       });
 
-      navigate('/'); 
+      navigate('/'); // Redirect to home or marketplace after success
     } catch (err: any) {
       console.error('Error creating want listing:', err);
       setError(err.message || '發佈失敗，請稍後再試');
@@ -79,6 +79,7 @@ export const CreateWant = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Title */}
           <div>
             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">徵求卡牌名稱 <span className="text-red-500">*</span></label>
             <input
@@ -92,6 +93,7 @@ export const CreateWant = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {/* Target Price */}
             <div>
               <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">期望價格 (HK$) <span className="text-red-500">*</span></label>
               <div className="relative">
@@ -108,6 +110,7 @@ export const CreateWant = () => {
               </div>
             </div>
 
+            {/* Condition */}
             <div>
               <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">要求卡況 <span className="text-red-500">*</span></label>
               <select
@@ -120,6 +123,7 @@ export const CreateWant = () => {
             </div>
           </div>
 
+          {/* Description */}
           <div>
             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">備註說明</label>
             <textarea
@@ -131,6 +135,7 @@ export const CreateWant = () => {
             />
           </div>
 
+          {/* Submit Button */}
           <div className="pt-4">
             <button
               type="submit"
