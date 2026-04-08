@@ -295,7 +295,6 @@ export const Home: React.FC = () => {
       const snapshot = await getDocs(q);
       const dbArticles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      // Merge static articles with DB articles, avoiding duplicates by ID
       const merged = [...dbArticles];
       ARTICLES.forEach(staticArt => {
         if (!merged.find(a => a.id === staticArt.id)) {
@@ -303,7 +302,6 @@ export const Home: React.FC = () => {
         }
       });
 
-      // Sort all articles by createdAt desc
       merged.sort((a: any, b: any) => {
         const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
         const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
@@ -550,7 +548,6 @@ export const Home: React.FC = () => {
             [...Array(3)].map((_, i) => <ArticleSkeleton key={i} />)
           ) : (
             <>
-              {/* 文章 1 區 (Featured) - 佔據左側兩欄 */}
               <div className="lg:col-span-2 h-full">
                 {localArticles
                   .filter(a => a.zone === 1 || (a.featured && !a.zone))
@@ -563,7 +560,6 @@ export const Home: React.FC = () => {
                 }
               </div>
               
-              {/* 文章 2 區 & 3 區 - 佔據右側一欄，垂直堆疊 */}
               <div className="lg:col-span-1 grid grid-cols-2 lg:flex lg:flex-col gap-3 sm:gap-6 h-full">
                 {localArticles.filter(a => a.zone === 2).slice(0, 1).map(article => (
                   <div key={article.id} className="flex-1">
