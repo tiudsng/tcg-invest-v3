@@ -305,8 +305,8 @@ export const Home: React.FC = () => {
 
       // Sort all articles by createdAt desc
       merged.sort((a: any, b: any) => {
-        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : (a.createdAt ? new Date(a.createdAt) : new Date());
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : (b.createdAt ? new Date(b.createdAt) : new Date());
         return dateB.getTime() - dateA.getTime();
       });
       
@@ -550,31 +550,42 @@ export const Home: React.FC = () => {
             [...Array(3)].map((_, i) => <ArticleSkeleton key={i} />)
           ) : (
             <>
-              {/* 文章 1 區 (Featured) - 佔據左側兩欄 */}
+              {/* 文章 1 區 (Large Slot) */}
               <div className="lg:col-span-2 h-full">
-                {localArticles
-                  .filter(a => a.zone === 1 || (a.featured && !a.zone))
-                  .slice(0, 1)
-                  .map(article => (
-                    <div key={article.id} className="h-full">
-                      <FeaturedArticle article={article} isLarge onEdit={handleArticleEdit} />
+                {(() => {
+                  const article1 = localArticles.find(a => a.zone === 1 || a.category?.includes('文章 1 區') || a.category?.includes('文章1區')) || localArticles[0];
+                  return article1 ? (
+                    <div className="h-full">
+                      <FeaturedArticle article={article1} isLarge onEdit={handleArticleEdit} />
                     </div>
-                  ))
-                }
+                  ) : null;
+                })()}
               </div>
               
-              {/* 文章 2 區 & 3 區 - 佔據右側一欄，垂直堆疊 */}
+              {/* 文章 2 區 & 3 區 (Small Slots) */}
               <div className="lg:col-span-1 grid grid-cols-2 lg:flex lg:flex-col gap-3 sm:gap-6 h-full">
-                {localArticles.filter(a => a.zone === 2).slice(0, 1).map(article => (
-                  <div key={article.id} className="flex-1">
-                    <FeaturedArticle article={article} onEdit={handleArticleEdit} />
-                  </div>
-                ))}
-                {localArticles.filter(a => a.zone === 3).slice(0, 1).map(article => (
-                  <div key={article.id} className="flex-1">
-                    <FeaturedArticle article={article} onEdit={handleArticleEdit} />
-                  </div>
-                ))}
+                {(() => {
+                  const article1 = localArticles.find(a => a.zone === 1 || a.category?.includes('文章 1 區') || a.category?.includes('文章1區')) || localArticles[0];
+                  const article2 = localArticles.find(a => (a.zone === 2 || a.category?.includes('文章 2 區') || a.category?.includes('文章2區')) && a.id !== article1?.id) 
+                                   || localArticles.find(a => a.id !== article1?.id);
+                  return article2 ? (
+                    <div className="flex-1">
+                      <FeaturedArticle article={article2} onEdit={handleArticleEdit} />
+                    </div>
+                  ) : null;
+                })()}
+                {(() => {
+                  const article1 = localArticles.find(a => a.zone === 1 || a.category?.includes('文章 1 區') || a.category?.includes('文章1區')) || localArticles[0];
+                  const article2 = localArticles.find(a => (a.zone === 2 || a.category?.includes('文章 2 區') || a.category?.includes('文章2區')) && a.id !== article1?.id) 
+                                   || localArticles.find(a => a.id !== article1?.id);
+                  const article3 = localArticles.find(a => (a.zone === 3 || a.category?.includes('文章 3 區') || a.category?.includes('文章3區')) && a.id !== article1?.id && a.id !== article2?.id)
+                                   || localArticles.find(a => a.id !== article1?.id && a.id !== article2?.id);
+                  return article3 ? (
+                    <div className="flex-1">
+                      <FeaturedArticle article={article3} onEdit={handleArticleEdit} />
+                    </div>
+                  ) : null;
+                })()}
               </div>
             </>
           )}

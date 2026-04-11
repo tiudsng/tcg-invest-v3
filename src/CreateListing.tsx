@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { Camera, Upload, X, ArrowRight, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Camera, Upload, X, ArrowRight, Image as ImageIcon, Loader2, Search, Scan } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebase';
 import { motion } from 'motion/react';
+import { CardSearchModal } from './components/CardSearchModal';
+import { GoogleGenAI } from '@google/genai';
+import { toast } from 'sonner';
 
 export const CreateListing = () => {
   const { user } = useAuth();
@@ -18,7 +21,10 @@ export const CreateListing = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState('');
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
   const CONDITIONS = ['Mint (M)', 'Near Mint (NM)', 'Lightly Played (LP)', 'Moderately Played (MP)', 'Heavily Played (HP)', 'Damaged', 'PSA 10', 'PSA 9', 'BGS 10', 'BGS 9.5'];
 
@@ -31,6 +37,72 @@ export const CreateListing = () => {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAIAnalyze = async () => {
+    if (!imagePreview) {
+      toast.error('請先上傳圖片');
+      return;
+    }
+    setIsAnalyzing(true);
+    try {
+      const match = imagePreview.match(/^data:(image\/\w+);base64,/);
+      const mimeType = match ? match[1] : "image/jpeg";
+      const base64Data = imagePreview.replace(/^data:image\/\w+;base64,/, "");
+
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: 'Identify this Pokemon card. Return ONLY a valid JSON object with a single key "name" containing the Pokemon\'s name or character\'s name in Traditional Chinese or Japanese (e.g., {"name": "噴火龍"}). Do not include markdown formatting like ```json.' },
+              { inlineData: { data: base64Data, mimeType: mimeType } }
+            ]
+          }
+        ]
+      });
+
+      const text = response.text;
+      if (!text) throw new Error("No text returned from AI");
+
+      const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      const data = JSON.parse(cleanedText);
+
+      if (data && data.name) {
+        setTitle(data.name);
+        toast.success(`AI 辨識成功：${data.name}`);
+      } else {
+        toast.error('無法辨識卡牌');
+      }
+    } catch (err) {
+      console.error('AI Error:', err);
+      toast.error('AI 辨識失敗');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleCardSelect = async (card: any) => {
+    setTitle(card.cardNameViewText);
+    setSelectedCardId(card.cardID);
+    setIsSearchModalOpen(false);
+    
+    // If no image is selected yet, use the official card image as preview
+    if (!imageFile && !imagePreview) {
+      setImagePreview(`https://www.pokemon-card.com${card.cardThumbFile}`);
+      
+      // Try to fetch the image and convert to File object
+      try {
+        const response = await fetch(`https://www.pokemon-card.com${card.cardThumbFile}`);
+        const blob = await response.blob();
+        const file = new File([blob], `${card.cardID}.jpg`, { type: 'image/jpeg' });
+        setImageFile(file);
+      } catch (err) {
+        console.error('Error fetching official image:', err);
+      }
     }
   };
 
@@ -61,6 +133,7 @@ export const CreateListing = () => {
         condition,
         description,
         imageUrl,
+        officialCardId: selectedCardId,
         sellerId: user.uid,
         sellerName: user.displayName || '匿名賣家',
         sellerPhoto: user.photoURL || '',
@@ -101,19 +174,40 @@ export const CreateListing = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Official DB Search Button */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setIsSearchModalOpen(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl font-bold transition-colors border border-indigo-100 dark:border-indigo-500/20"
+            >
+              <Search className="w-5 h-5" />
+              從官方資料庫搜尋卡牌 (自動帶入圖片與名稱)
+            </button>
+          </div>
+
           {/* Image Upload */}
           <div>
             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">卡牌圖片 <span className="text-red-500">*</span></label>
             <div className="relative">
               {imagePreview ? (
-                <div className="relative w-full aspect-[4/3] sm:aspect-video rounded-2xl overflow-hidden bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800">
+                <div className="relative w-full aspect-[4/3] sm:aspect-video rounded-2xl overflow-hidden bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 group">
                   <img src={imagePreview} alt="Preview" className="w-full h-full object-contain" />
                   <button
                     type="button"
-                    onClick={() => { setImageFile(null); setImagePreview(null); }}
+                    onClick={() => { setImageFile(null); setImagePreview(null); setSelectedCardId(null); }}
                     className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-md transition-colors"
                   >
                     <X className="w-5 h-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAIAnalyze}
+                    disabled={isAnalyzing}
+                    className="absolute bottom-4 right-4 px-4 py-2 bg-blue-600/90 hover:bg-blue-600 text-white rounded-xl backdrop-blur-md transition-all flex items-center gap-2 font-bold shadow-lg disabled:opacity-50"
+                  >
+                    {isAnalyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Scan className="w-5 h-5" />}
+                    {isAnalyzing ? '辨識中...' : 'AI 辨識'}
                   </button>
                 </div>
               ) : (
@@ -132,14 +226,31 @@ export const CreateListing = () => {
           {/* Title */}
           <div>
             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">卡牌名稱 <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white"
-              placeholder="例如：噴火龍 VMAX SSR"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="flex-1 px-4 py-3 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white"
+                placeholder="例如：噴火龍 VMAX SSR"
+              />
+              <button
+                type="button"
+                onClick={handleAIAnalyze}
+                disabled={isAnalyzing || !imagePreview}
+                className="flex flex-col items-center justify-center w-16 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-blue-100 dark:border-blue-500/20"
+              >
+                {isAnalyzing ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <Scan className="w-5 h-5 mb-0.5" />
+                    <span className="text-[10px] font-bold leading-none">AI 辨識</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -207,6 +318,11 @@ export const CreateListing = () => {
           </div>
         </form>
       </motion.div>
+      <CardSearchModal 
+        isOpen={isSearchModalOpen} 
+        onClose={() => setIsSearchModalOpen(false)} 
+        onSelect={handleCardSelect} 
+      />
     </div>
   );
 };
