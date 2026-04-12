@@ -4,6 +4,7 @@ import cors from "cors";
 import axios from "axios";
 import { createServer as createViteServer } from "vite";
 import path from "path";
+import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
 
 async function startServer() {
@@ -45,9 +46,14 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, { index: false }));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      let html = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
+      html = html.replace(
+        /<script>window\.__GEMINI_API_KEY__ = ".*?";<\/script>/,
+        `<script>window.__GEMINI_API_KEY__ = ${JSON.stringify(process.env.GEMINI_API_KEY || '')};</script>`
+      );
+      res.send(html);
     });
   }
 

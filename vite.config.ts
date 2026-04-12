@@ -5,9 +5,21 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(), 
+      tailwindcss(),
+      {
+        name: 'inject-api-key',
+        transformIndexHtml(html) {
+          return html.replace(
+            '</head>',
+            `<script>window.__GEMINI_API_KEY__ = ${JSON.stringify(process.env.GEMINI_API_KEY || '')};</script></head>`
+          );
+        }
+      }
+    ],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY),
+      'process.env.GEMINI_API_KEY': 'window.__GEMINI_API_KEY__',
     },
     resolve: {
       alias: {
