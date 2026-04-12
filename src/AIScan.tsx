@@ -3,17 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import { X, Image as ImageIcon, Settings, Check, ChevronDown, Loader2, Camera, FolderUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI, Type } from '@google/genai';
+import { Type } from '@google/genai';
 import { toast } from 'sonner';
-
-const getApiKey = () => {
-  try {
-    // @ts-ignore
-    return window.__GEMINI_API_KEY__ || process.env.GEMINI_API_KEY || '';
-  } catch {
-    return '';
-  }
-};
 
 export const AIScan = () => {
   const navigate = useNavigate();
@@ -76,32 +67,15 @@ export const AIScan = () => {
   const handleAnalyze = async () => {
     if (!capturedImage) return;
     
-    const apiKey = getApiKey();
-    if (!apiKey) {
-      toast.error('系統錯誤：找不到 API Key。請點擊右上角 Share 按鈕重新部署應用程式。');
-      return;
-    }
-    
     setIsAnalyzing(true);
     try {
-      const base64Data = capturedImage.split(',')[1];
-      const mimeType = capturedImage.split(';')[0].split(':')[1] || 'image/jpeg';
-
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: 'Identify this trading card. Find its card number. Use Google Search to find the recent eBay market value for this specific card in **PSA 10** condition, and convert it to Hong Kong Dollars (HKD). Return a JSON object. If you cannot identify the card, return "Unknown" for the name.' },
-              { inlineData: { data: base64Data, mimeType: mimeType } }
-            ]
-          }
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
+      const response = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: capturedImage,
+          prompt: 'Identify this trading card. Find its card number. Use Google Search to find the recent eBay market value for this specific card in **PSA 10** condition, and convert it to Hong Kong Dollars (HKD). Return a JSON object. If you cannot identify the card, return "Unknown" for the name.',
+          schema: {
             type: Type.OBJECT,
             properties: {
               name: { type: Type.STRING, description: "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify." },
@@ -109,15 +83,16 @@ export const AIScan = () => {
               priceHKD: { type: Type.NUMBER, description: "Estimated eBay price for PSA 10 in HKD" }
             },
             required: ["name"]
-          },
-          tools: [{ googleSearch: {} }]
-        }
+          }
+        })
       });
 
-      const text = response.text;
-      if (!text) throw new Error("No text returned from AI");
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || '辨識失敗');
+      }
 
-      const data = JSON.parse(text);
+      const data = await response.json();
 
       if (data && data.name && data.name !== "Unknown") {
         toast.success(`AI 辨識成功：${data.name}`);

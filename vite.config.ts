@@ -9,9 +9,6 @@ export default defineConfig(() => {
       react(), 
       tailwindcss(),
     ],
-    define: {
-      'process.env.GEMINI_API_KEY': 'globalThis.__GEMINI_API_KEY__',
-    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

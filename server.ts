@@ -37,6 +37,48 @@ async function startServer() {
     }
   });
 
+  // AI Analysis route
+  app.post("/api/ai/analyze", async (req, res) => {
+    try {
+      const { image, prompt, schema } = req.body;
+      if (!image) return res.status(400).json({ error: "No image provided" });
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) return res.status(500).json({ error: "Gemini API Key not configured on server" });
+
+      const ai = new GoogleGenAI({ apiKey });
+      const base64Data = image.split(",")[1] || image;
+      const mimeType = image.split(";")[0].split(":")[1] || "image/jpeg";
+
+      const response = await ai.models.generateContent({
+        model: "gemini-1.5-flash",
+        config: schema ? {
+          responseMimeType: "application/json",
+          responseSchema: schema
+        } : undefined,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt || "Identify this trading card." },
+              { inlineData: { data: base64Data, mimeType: mimeType } }
+            ]
+          }
+        ]
+      });
+
+      const text = response.text;
+      try {
+        res.json(JSON.parse(text));
+      } catch (e) {
+        res.json({ text });
+      }
+    } catch (error: any) {
+      console.error("AI Analysis Error:", error);
+      res.status(500).json({ error: error.message || "AI Analysis failed" });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -46,17 +88,9 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath, { index: false }));
+    app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      try {
-        let html = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
-        // Inject the API key at runtime
-        const scriptTag = `<script>window.__GEMINI_API_KEY__ = ${JSON.stringify(process.env.GEMINI_API_KEY || "")};</script>`;
-        html = html.replace("</head>", `${scriptTag}</head>`);
-        res.send(html);
-      } catch (e) {
-        res.sendFile(path.join(distPath, "index.html"));
-      }
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 

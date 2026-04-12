@@ -14,6 +14,7 @@ import { ProductDetail } from './ProductDetail';
 import { ArticleDetail } from './ArticleDetail';
 import { Articles } from './Articles';
 import { AIScan } from './AIScan';
+import { Admin } from './Admin';
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
                 <Route path="/article/:id" element={<ArticleDetail />} />
                 <Route path="/articles" element={<Articles />} />
                 <Route path="/ai-scan" element={<AIScan />} />
+                <Route path="/admin" element={<Admin />} />
               </Routes>
             </div>
             <BottomNav />
