@@ -6,6 +6,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Type } from '@google/genai';
 import { toast } from 'sonner';
 
+const getApiKey = () => {
+  try {
+    // @ts-ignore
+    return window.__GEMINI_API_KEY__ || process.env.GEMINI_API_KEY || '';
+  } catch {
+    return '';
+  }
+};
+
 export const AIScan = () => {
   const navigate = useNavigate();
   const webcamRef = useRef<Webcam>(null);
@@ -14,15 +23,37 @@ export const AIScan = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [scanResult, setScanResult] = useState<{name: string, cardNumber?: string, priceHKD?: number} | null>(null);
   const [gameSelection, setGameSelection] = useState('Trading Card Games');
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
-  const videoConstraints = {
-    facingMode: 'environment',
+  const [useBasicConstraints, setUseBasicConstraints] = useState(false);
+
+  const videoConstraints = useBasicConstraints ? true : {
+    facingMode: { ideal: 'environment' }
+  };
+
+  const handleCameraError = (error: string | DOMException) => {
+    console.error('Webcam Error:', error);
+    setCameraError(typeof error === 'string' ? error : error.message);
+  };
+
+  const tryBasicCamera = () => {
+    setCameraError(null);
+    setUseBasicConstraints(true);
   };
 
   const capture = useCallback(() => {
     if (webcamRef.current) {
-      const imageSrc = webcamRef.current.getScreenshot();
-      setCapturedImage(imageSrc);
+      try {
+        const imageSrc = webcamRef.current.getScreenshot();
+        if (imageSrc) {
+          setCapturedImage(imageSrc);
+        } else {
+          toast.error('無法擷取圖片，請重試');
+        }
+      } catch (err) {
+        console.error('Capture Error:', err);
+        toast.error('擷取失敗');
+      }
     }
   }, [webcamRef]);
 
@@ -45,7 +76,8 @@ export const AIScan = () => {
   const handleAnalyze = async () => {
     if (!capturedImage) return;
     
-    if (!process.env.GEMINI_API_KEY) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
       toast.error('系統錯誤：找不到 API Key。請點擊右上角 Share 按鈕重新部署應用程式。');
       return;
     }
@@ -55,9 +87,9 @@ export const AIScan = () => {
       const base64Data = capturedImage.split(',')[1];
       const mimeType = capturedImage.split(';')[0].split(':')[1] || 'image/jpeg';
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+        model: "gemini-1.5-flash",
         contents: [
           {
             role: "user",
@@ -104,19 +136,49 @@ export const AIScan = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-40 bg-black flex flex-col font-sans">
+    <div className="fixed inset-0 z-[50] bg-black flex flex-col font-sans">
       {/* Camera / Preview Area - Takes remaining space */}
       <div className="flex-1 relative overflow-hidden bg-black">
         {capturedImage ? (
           <img src={capturedImage} alt="Captured" className="absolute inset-0 w-full h-full object-cover" />
         ) : (
-          <Webcam
-            audio={false}
-            ref={webcamRef}
-            screenshotFormat="image/jpeg"
-            videoConstraints={videoConstraints}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+          <>
+            <Webcam
+              audio={false}
+              ref={webcamRef}
+              screenshotFormat="image/jpeg"
+              videoConstraints={videoConstraints}
+              onUserMediaError={handleCameraError}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            {cameraError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 px-6 text-center">
+                <Settings className="w-12 h-12 text-gray-500 mb-4" />
+                <p className="text-white font-bold mb-2">無法啟動相機</p>
+                <p className="text-gray-400 text-sm mb-6">{cameraError}</p>
+                <div className="flex flex-col gap-3 w-full max-w-xs">
+                  <button 
+                    onClick={tryBasicCamera}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold active:scale-95 transition-transform"
+                  >
+                    嘗試預設相機
+                  </button>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-6 py-3 bg-white/10 text-white rounded-xl font-bold active:scale-95 transition-transform"
+                  >
+                    從相簿上傳
+                  </button>
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="px-6 py-3 bg-white/5 text-white/60 rounded-xl font-bold active:scale-95 transition-transform"
+                  >
+                    重新整理頁面
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Scanning Frame Overlay */}

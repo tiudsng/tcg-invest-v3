@@ -17,6 +17,8 @@ export const Navbar: React.FC = () => {
                       location.pathname.startsWith('/edit-') ||
                       (location.pathname.startsWith('/profile/') && location.pathname !== '/profile');
 
+  const shouldHide = location.pathname === '/ai-scan';
+
   const handleBack = () => {
     if (window.history.length > 1) {
       navigate(-1);
@@ -74,6 +76,8 @@ export const Navbar: React.FC = () => {
   if (user && !user.isGuest && user.role === 'admin') {
     navLinks.push({ path: '/admin', label: '管理員', icon: ShieldCheck, protected: true });
   }
+
+  if (shouldHide) return null;
 
   return (
     <>

@@ -13,6 +13,7 @@ import { ListingDetail } from './ListingDetail';
 import { ProductDetail } from './ProductDetail';
 import { ArticleDetail } from './ArticleDetail';
 import { Articles } from './Articles';
+import { AIScan } from './AIScan';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
                 <Route path="/product/:id" element={<ProductDetail />} />
                 <Route path="/article/:id" element={<ArticleDetail />} />
                 <Route path="/articles" element={<Articles />} />
+                <Route path="/ai-scan" element={<AIScan />} />
               </Routes>
             </div>
             <BottomNav />

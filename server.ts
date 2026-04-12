@@ -1,14 +1,40 @@
+import "dotenv/config";
 import express from "express";
+import cors from "cors";
+import axios from "axios";
 import { createServer as createViteServer } from "vite";
 import path from "path";
+import fs from "fs";
+import { GoogleGenAI } from "@google/genai";
 
 async function startServer() {
+  console.log("GEMINI_API_KEY exists in server:", !!process.env.GEMINI_API_KEY);
   const app = express();
   const PORT = 3000;
 
+  app.use(cors());
+  app.use(express.json({ limit: "50mb" }));
+
   // API routes FIRST
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
+  app.get("/api/search", async (req, res) => {
+    try {
+      const { keyword, page } = req.query;
+      const params = new URLSearchParams({
+        keyword: (keyword as string) || "",
+        sm_and_keyword: "true",
+        regulation_sidebar_form: "all",
+        page: (page as string) || "1",
+      });
+
+      const response = await axios.get(
+        `https://www.pokemon-card.com/card-search/resultAPI.php?${params.toString()}`
+      );
+
+      res.json(response.data);
+    } catch (error) {
+      console.error("Error fetching from Pokemon Card API:", error);
+      res.status(500).json({ error: "Failed to fetch data" });
+    }
   });
 
   // Vite middleware for development
@@ -19,10 +45,18 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath, { index: false }));
+    app.get("*", (req, res) => {
+      try {
+        let html = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
+        // Inject the API key at runtime
+        const scriptTag = `<script>window.__GEMINI_API_KEY__ = ${JSON.stringify(process.env.GEMINI_API_KEY || "")};</script>`;
+        html = html.replace("</head>", `${scriptTag}</head>`);
+        res.send(html);
+      } catch (e) {
+        res.sendFile(path.join(distPath, "index.html"));
+      }
     });
   }
 
