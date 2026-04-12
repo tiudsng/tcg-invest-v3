@@ -5,7 +5,7 @@ import axios from "axios";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import fs from "fs";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 async function startServer() {
   console.log("GEMINI_API_KEY exists in server:", !!process.env.GEMINI_API_KEY);
@@ -39,35 +39,46 @@ async function startServer() {
 
   // AI Analysis route
   app.post("/api/ai/analyze", async (req, res) => {
+    console.log("AI Analysis request received");
     try {
       const { image, prompt, schema } = req.body;
-      if (!image) return res.status(400).json({ error: "No image provided" });
+      if (!image) {
+        console.error("No image provided in request");
+        return res.status(400).json({ error: "No image provided" });
+      }
 
       const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) return res.status(500).json({ error: "Gemini API Key not configured on server" });
+      if (!apiKey) {
+        console.error("Gemini API Key not configured on server");
+        return res.status(500).json({ error: "Gemini API Key not configured on server" });
+      }
 
-      const ai = new GoogleGenAI({ apiKey });
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        generationConfig: schema ? {
+          responseMimeType: "application/json",
+          responseSchema: schema
+        } : undefined
+      });
+
       const base64Data = image.split(",")[1] || image;
       const mimeType = image.split(";")[0].split(":")[1] || "image/jpeg";
 
-      const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        config: schema ? {
-          responseMimeType: "application/json",
-          responseSchema: schema
-        } : undefined,
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: prompt || "Identify this trading card." },
-              { inlineData: { data: base64Data, mimeType: mimeType } }
-            ]
+      console.log("Calling Gemini API...");
+      const result = await model.generateContent([
+        prompt || "Identify this trading card.",
+        {
+          inlineData: {
+            data: base64Data,
+            mimeType: mimeType
           }
-        ]
-      });
+        }
+      ]);
 
-      const text = response.text;
+      const text = result.response.text();
+      console.log("Gemini API response received:", text);
+      
       try {
         res.json(JSON.parse(text));
       } catch (e) {

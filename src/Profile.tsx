@@ -387,6 +387,18 @@ export const Profile = () => {
                 <p className="text-sm text-gray-500 dark:text-gray-400">查看與編輯您的徵收需求</p>
               </div>
             </button>
+
+            {user.email === 'appleyes516@gmail.com' && (
+              <button onClick={() => navigate('/admin')} className="flex-1 flex items-center gap-4 p-6 rounded-[2rem] bg-blue-600 hover:bg-blue-700 transition-colors border border-blue-500 shadow-lg shadow-blue-500/20 group">
+                <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                  <Shield className="w-7 h-7" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-lg font-black text-white">管理後台</h3>
+                  <p className="text-sm text-white/80">管理網站數據、用戶與內容</p>
+                </div>
+              </button>
+            )}
           </div>
         </div>
       </motion.div>

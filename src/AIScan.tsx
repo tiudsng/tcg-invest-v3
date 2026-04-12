@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import { X, Image as ImageIcon, Settings, Check, ChevronDown, Loader2, Camera, FolderUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Type } from '@google/genai';
+import { SchemaType } from '@google/generative-ai';
 import { toast } from 'sonner';
 
 export const AIScan = () => {
@@ -76,11 +76,11 @@ export const AIScan = () => {
           image: capturedImage,
           prompt: 'Identify this trading card. Find its card number. Use Google Search to find the recent eBay market value for this specific card in **PSA 10** condition, and convert it to Hong Kong Dollars (HKD). Return a JSON object. If you cannot identify the card, return "Unknown" for the name.',
           schema: {
-            type: Type.OBJECT,
+            type: SchemaType.OBJECT,
             properties: {
-              name: { type: Type.STRING, description: "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify." },
-              cardNumber: { type: Type.STRING, description: "Card number (e.g., 201/165)" },
-              priceHKD: { type: Type.NUMBER, description: "Estimated eBay price for PSA 10 in HKD" }
+              name: { type: SchemaType.STRING, description: "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify." },
+              cardNumber: { type: SchemaType.STRING, description: "Card number (e.g., 201/165)" },
+              priceHKD: { type: SchemaType.NUMBER, description: "Estimated eBay price for PSA 10 in HKD" }
             },
             required: ["name"]
           }

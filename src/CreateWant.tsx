@@ -6,7 +6,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 import { motion } from 'motion/react';
 import { CardSearchModal } from './components/CardSearchModal';
-import { Type } from '@google/genai';
+import { SchemaType } from '@google/generative-ai';
 import { toast } from 'sonner';
 
 export const CreateWant = () => {
@@ -50,9 +50,9 @@ export const CreateWant = () => {
               image: base64,
               prompt: 'Identify this Pokemon card. Return ONLY a valid JSON object with a single key "name" containing the Pokemon\'s name or character\'s name in Traditional Chinese or Japanese (e.g., {"name": "噴火龍"}). If you cannot identify it, return {"name": "Unknown"}. Do not include markdown formatting.',
               schema: {
-                type: Type.OBJECT,
+                type: SchemaType.OBJECT,
                 properties: {
-                  name: { type: Type.STRING, description: "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify." }
+                  name: { type: SchemaType.STRING, description: "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify." }
                 },
                 required: ["name"]
               }
