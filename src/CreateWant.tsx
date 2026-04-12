@@ -40,6 +40,12 @@ export const CreateWant = () => {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64 = reader.result as string;
+
+        if (!process.env.GEMINI_API_KEY) {
+          toast.error('系統錯誤：找不到 API Key。請點擊右上角 Share 按鈕重新部署應用程式。');
+          return;
+        }
+
         setIsAnalyzing(true);
         try {
           const base64Data = base64.split(',')[1];

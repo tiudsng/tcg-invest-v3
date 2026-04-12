@@ -19,7 +19,7 @@ export default defineConfig(() => {
       }
     ],
     define: {
-      'process.env.GEMINI_API_KEY': 'window.__GEMINI_API_KEY__',
+      'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY),
     },
     resolve: {
       alias: {

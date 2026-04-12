@@ -45,6 +45,12 @@ export const CreateListing = () => {
       toast.error('請先上傳圖片');
       return;
     }
+
+    if (!process.env.GEMINI_API_KEY) {
+      toast.error('系統錯誤：找不到 API Key。請點擊右上角 Share 按鈕重新部署應用程式。');
+      return;
+    }
+
     setIsAnalyzing(true);
     try {
       const base64Data = imagePreview.split(',')[1];

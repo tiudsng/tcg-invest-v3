@@ -46,14 +46,9 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath, { index: false }));
+    app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      let html = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
-      html = html.replace(
-        /<script>window\.__GEMINI_API_KEY__ = ".*?";<\/script>/,
-        `<script>window.__GEMINI_API_KEY__ = ${JSON.stringify(process.env.GEMINI_API_KEY || '')};</script>`
-      );
-      res.send(html);
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
