@@ -1,5 +1,5 @@
 {
   "name": "Project Restore",
   "description": "Restoring an old React + Vite project from uploaded files.",
-  "requestFramePermissions": ["camera"]
+  "requestFramePermissions": []
 }

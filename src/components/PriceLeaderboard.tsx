@@ -150,7 +150,7 @@ export const PriceLeaderboard = () => {
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-[#0a0a0a] rounded-3xl py-12 flex flex-col justify-center items-center h-64 border border-gray-100 dark:border-white/5 shadow-sm">
+      <div className="bg-[#0a0a0a] rounded-3xl py-12 flex flex-col justify-center items-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#d4af37] mb-4"></div>
         <p className="text-[#d4af37] text-sm font-medium">載入排行榜中...</p>
       </div>
@@ -161,17 +161,17 @@ export const PriceLeaderboard = () => {
   const remainingCards = products.slice(3);
 
   return (
-    <div className="mb-12 sm:mb-16 bg-white dark:bg-[#0a0a0a] rounded-3xl p-4 sm:p-6 shadow-2xl overflow-hidden border border-gray-100 dark:border-white/5">
+    <div className="mb-12 sm:mb-16 bg-[#0a0a0a] rounded-3xl p-4 sm:p-6 shadow-2xl overflow-hidden border border-white/5">
       <div className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {/* NO.1 Card */}
         {topCards[0] && (
           <div 
             onClick={() => navigate(`/product/${topCards[0].id || topCards[0].card_id}`)}
-            className="col-span-2 lg:col-span-1 relative rounded-2xl overflow-hidden border border-[#d4af37] bg-white dark:bg-[#111] flex flex-col shadow-[0_0_15px_rgba(212,175,55,0.15)] cursor-pointer hover:scale-[1.02] transition-transform duration-300"
+            className="col-span-2 lg:col-span-1 relative rounded-2xl overflow-hidden border border-[#d4af37] bg-[#111] flex flex-col shadow-[0_0_15px_rgba(212,175,55,0.15)] cursor-pointer hover:scale-[1.02] transition-transform duration-300"
           >
             {/* Image Section */}
-            <div className="relative w-full aspect-[4/3] sm:aspect-[16/9] lg:aspect-[3/4] bg-gray-100 dark:bg-gray-900">
+            <div className="relative w-full aspect-[4/3] sm:aspect-[16/9] lg:aspect-[3/4] bg-gray-900">
               <div className="absolute top-3 left-3 z-10 text-[#d4af37] text-2xl sm:text-3xl font-black drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] tracking-tighter">NO.1</div>
                 <img 
                   src={topCards[0].image_url || (topCards[0] as any).imageUrl || 'https://placehold.co/600x450/1c1c1e/888888?text=Card+Image'} 
@@ -182,21 +182,21 @@ export const PriceLeaderboard = () => {
                     (e.target as HTMLImageElement).src = 'https://placehold.co/600x450/1c1c1e/888888?text=Image+Error';
                   }}
                 />
-              <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-[#111] to-transparent"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#111] to-transparent"></div>
             </div>
             
             {/* Info Section */}
-            <div className="p-4 pt-0 relative z-10 bg-white dark:bg-[#111] flex-grow flex flex-col justify-between">
+            <div className="p-4 pt-0 relative z-10 bg-[#111] flex-grow flex flex-col justify-between">
               <div>
                 <div className="flex justify-between items-start gap-2 mb-2">
-                  <h3 className="text-gray-900 dark:text-white font-bold text-sm sm:text-base uppercase leading-tight line-clamp-2">
+                  <h3 className="text-white font-bold text-sm sm:text-base uppercase leading-tight line-clamp-2">
                     {topCards[0].name_zh} {topCards[0].set_name ? `- ${topCards[0].set_name}` : ''} {topCards[0].card_number ? `#${topCards[0].card_number}` : ''}
                   </h3>
                   <div className="flex gap-2 shrink-0 items-center mt-0.5">
-                    <span className="text-xs font-bold text-gray-900 dark:text-white italic">ebay</span>
+                    <span className="text-xs font-bold text-white italic">ebay</span>
                     <div className="flex flex-col items-center">
-                      <div className="w-4 h-4 rounded-full border border-gray-900 dark:border-white flex items-center justify-center text-[8px] text-gray-900 dark:text-white font-bold">C</div>
-                      <span className="text-[5px] text-gray-900 dark:text-white uppercase mt-0.5">OpenClaw</span>
+                      <div className="w-4 h-4 rounded-full border border-white flex items-center justify-center text-[8px] text-white font-bold">C</div>
+                      <span className="text-[5px] text-white uppercase mt-0.5">OpenClaw</span>
                     </div>
                   </div>
                 </div>
@@ -209,7 +209,7 @@ export const PriceLeaderboard = () => {
                   </span>
                 </div>
               </div>
-              <div className="text-gray-500 dark:text-gray-400 text-[10px] font-medium border-t border-gray-200 dark:border-white/10 pt-2 mt-2">
+              <div className="text-gray-400 text-[10px] font-medium border-t border-white/10 pt-2 mt-2">
                 由 AI 和 OpenClaw 技術驅動 - 價格實時排行榜
               </div>
             </div>
@@ -221,17 +221,17 @@ export const PriceLeaderboard = () => {
           <div 
             key={card.id || card.card_id} 
             onClick={() => navigate(`/product/${card.id || card.card_id}`)}
-            className="col-span-1 bg-gray-50 dark:bg-[#1c1c1e] rounded-2xl p-4 sm:p-6 flex flex-col relative border border-transparent cursor-pointer hover:border-gray-200 dark:hover:border-white/10 hover:bg-gray-100 dark:hover:bg-[#222] transition-all shadow-sm dark:shadow-lg"
+            className="col-span-1 bg-[#1c1c1e] rounded-2xl p-4 sm:p-6 flex flex-col relative border border-transparent cursor-pointer hover:border-white/10 hover:bg-[#222] transition-all shadow-lg"
           >
             <div className="flex justify-between items-start mb-4">
               <span className="text-gray-400 font-black text-lg sm:text-xl tracking-tighter">NO.{idx + 2}</span>
-              <div className="bg-gray-900 text-white dark:bg-white dark:text-black text-[10px] font-black px-2 py-1 rounded leading-tight text-center uppercase tracking-tighter">SNKR<br/>DUNK</div>
+              <div className="bg-white text-black text-[10px] font-black px-2 py-1 rounded leading-tight text-center uppercase tracking-tighter">SNKR<br/>DUNK</div>
             </div>
             <div className="w-full aspect-[3/4] flex items-center justify-center mb-6">
               <img 
                 src={card.image_url || (card as any).imageUrl || 'https://placehold.co/400x560/1c1c1e/888888?text=Card+Image'} 
                 alt={card.name_zh} 
-                className="max-w-full max-h-full object-contain drop-shadow-[0_0_20px_rgba(0,0,0,0.1)] dark:drop-shadow-[0_0_20px_rgba(255,255,255,0.1)] group-hover:scale-105 transition-transform duration-500"
+                className="max-w-full max-h-full object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.1)] group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = 'https://placehold.co/400x560/1c1c1e/888888?text=Image+Error';
@@ -239,11 +239,11 @@ export const PriceLeaderboard = () => {
               />
             </div>
             <div className="mt-auto">
-              <h4 className="text-gray-900 dark:text-white text-sm sm:text-lg font-black truncate mb-1 tracking-tight">{card.name_zh}</h4>
+              <h4 className="text-white text-sm sm:text-lg font-black truncate mb-1 tracking-tight">{card.name_zh}</h4>
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
                 <span className="text-[#d4af37] font-black text-base sm:text-xl">HK$ {card.market_data?.snkrdunk_price?.toLocaleString()}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400 dark:text-gray-600 hidden sm:inline">/</span>
+                  <span className="text-gray-600 hidden sm:inline">/</span>
                   <span className="text-sm font-bold">{renderChange(card.market_data?.change_24h)}</span>
                 </div>
               </div>
@@ -257,12 +257,12 @@ export const PriceLeaderboard = () => {
           <div className="mt-4">
             <button 
               onClick={() => setIsExpanded(!isExpanded)}
-              className="w-full bg-gray-50 dark:bg-[#1c1c1e] rounded-2xl p-4 flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-transform border border-gray-100 dark:border-transparent hover:bg-gray-100 dark:hover:bg-[#222]"
+              className="w-full bg-[#1c1c1e] rounded-2xl p-4 flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-transform"
             >
-              <span className="text-gray-500 dark:text-gray-400 text-xs font-medium">
+              <span className="text-gray-400 text-xs font-medium">
                 查看 NO.4 - NO.10 的完整實時排行榜
               </span>
-              <ChevronDown className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
             </button>
 
             <AnimatePresence>
@@ -279,12 +279,12 @@ export const PriceLeaderboard = () => {
                       <div 
                         key={card.id || card.card_id} 
                         onClick={() => navigate(`/product/${card.id || card.card_id}`)}
-                        className="bg-gray-50 dark:bg-[#1c1c1e] rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#222] transition-colors border border-gray-100 dark:border-transparent"
+                        className="bg-[#1c1c1e] rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:bg-[#222] transition-colors"
                       >
                         <div className="w-8 text-gray-400 font-bold text-sm text-center tracking-tighter">
                           NO.{card.rank}
                         </div>
-                        <div className="w-10 aspect-[3/4] flex items-center justify-center bg-white dark:bg-black/40 rounded border border-gray-200 dark:border-white/5 p-0.5">
+                        <div className="w-10 aspect-[3/4] flex items-center justify-center bg-black/40 rounded border border-white/5 p-0.5">
                           <img 
                             src={card.image_url || (card as any).imageUrl || 'https://placehold.co/400x560/1c1c1e/888888?text=Card+Image'} 
                             alt={card.name_zh} 
@@ -296,9 +296,9 @@ export const PriceLeaderboard = () => {
                           />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-gray-900 dark:text-white text-xs font-bold truncate">{card.name_zh}</h4>
+                          <h4 className="text-white text-xs font-bold truncate">{card.name_zh}</h4>
                           <div className="text-[10px] flex items-center gap-1.5 mt-0.5">
-                            <span className="text-gray-500 dark:text-gray-400">HK$ {card.market_data?.snkrdunk_price?.toLocaleString()}</span>
+                            <span className="text-gray-400">HK$ {card.market_data?.snkrdunk_price?.toLocaleString()}</span>
                             {renderChange(card.market_data?.change_24h)}
                           </div>
                         </div>

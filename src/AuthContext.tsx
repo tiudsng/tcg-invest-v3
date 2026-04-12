@@ -18,8 +18,6 @@ export interface AppUser {
   photoURL: string | null;
   isGuest?: boolean;
   role?: 'admin' | 'user';
-  sellerRating?: number;
-  createdAt?: any;
 }
 
 interface AuthContextType {

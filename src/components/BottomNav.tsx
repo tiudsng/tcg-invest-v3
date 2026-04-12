@@ -8,8 +8,7 @@ import {
   Info, 
   Plus, 
   Search,
-  Camera,
-  User
+  Camera
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -36,8 +35,8 @@ export const BottomNav = () => {
     { icon: ShoppingBag, label: '市集', path: '/' },
     { icon: MessageCircle, label: '消息', path: '/chats' },
     { icon: null, label: '', path: '' }, 
+    { icon: Wrench, label: '工具', path: '/portfolio' },
     { icon: Info, label: '資訊', path: '/articles' },
-    { icon: User, label: '我的', path: '/profile' },
   ];
 
   const fabOptions = [

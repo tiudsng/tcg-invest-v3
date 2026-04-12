@@ -1,107 +1,23 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { Search, ArrowRight, Loader2, Image as ImageIcon, Scan } from 'lucide-react';
+import { Search, ArrowRight, Loader2 } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 import { motion } from 'motion/react';
-import { CardSearchModal } from './components/CardSearchModal';
-import { GoogleGenAI } from '@google/genai';
-import { toast } from 'sonner';
 
 export const CreateWant = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [title, setTitle] = useState('');
   const [targetPrice, setTargetPrice] = useState('');
   const [condition, setCondition] = useState('NM');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState('');
-  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const CONDITIONS = ['Any', 'Mint (M)', 'Near Mint (NM)', 'Lightly Played (LP)', 'PSA 10', 'PSA 9', 'BGS 10', 'BGS 9.5'];
-
-  const handleCardSelect = (card: any) => {
-    setTitle(card.cardNameViewText);
-    setSelectedCardId(card.cardID);
-    setImageUrl(`https://www.pokemon-card.com${card.cardThumbFile}`);
-    setIsSearchModalOpen(false);
-  };
-
-  const handleAIImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result as string;
-
-        if (!process.env.GEMINI_API_KEY) {
-          toast.error('系統錯誤：找不到 API Key。請點擊右上角 Share 按鈕重新部署應用程式。');
-          return;
-        }
-
-        setIsAnalyzing(true);
-        try {
-          const base64Data = base64.split(',')[1];
-          const mimeType = base64.split(';')[0].split(':')[1] || 'image/jpeg';
-
-          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-          const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: [
-              {
-                role: "user",
-                parts: [
-                  { text: 'Identify this Pokemon card. Return ONLY a valid JSON object with a single key "name" containing the Pokemon\'s name or character\'s name in Traditional Chinese or Japanese (e.g., {"name": "噴火龍"}). If you cannot identify it, return {"name": "Unknown"}. Do not include markdown formatting.' },
-                  { inlineData: { data: base64Data, mimeType: mimeType } }
-                ]
-              }
-            ]
-          });
-
-          const text = response.text;
-          if (!text) throw new Error("No text returned from AI");
-
-          let data;
-          try {
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              data = JSON.parse(jsonMatch[0]);
-            } else {
-              data = JSON.parse(text.replace(/```json/g, "").replace(/```/g, "").trim());
-            }
-          } catch (e) {
-            console.error("Failed to parse JSON:", text);
-            throw new Error("Invalid JSON format from AI");
-          }
-
-          if (data && data.name && data.name !== "Unknown") {
-            setTitle(data.name);
-            toast.success(`AI 辨識成功：${data.name}`);
-            // Optionally set it as the preview image for the want listing
-            setImageUrl(base64);
-            setSelectedCardId(null);
-          } else {
-            toast.error('無法辨識卡牌，請確保圖片清晰並重試');
-          }
-        } catch (err: any) {
-          console.error('AI Error:', err);
-          toast.error(`AI 辨識失敗: ${err.message || '未知錯誤'}`);
-        } finally {
-          setIsAnalyzing(false);
-          // reset input
-          if (fileInputRef.current) fileInputRef.current.value = '';
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,8 +39,6 @@ export const CreateWant = () => {
         targetPrice: Number(targetPrice),
         condition,
         description,
-        imageUrl: imageUrl || '',
-        officialCardId: selectedCardId,
         userId: user.uid,
         userName: user.displayName || '匿名買家',
         userPhoto: user.photoURL || '',
@@ -165,62 +79,17 @@ export const CreateWant = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Official DB Search Button */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setIsSearchModalOpen(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl font-bold transition-colors border border-indigo-100 dark:border-indigo-500/20"
-            >
-              <Search className="w-5 h-5" />
-              從官方資料庫搜尋卡牌 (自動帶入名稱與圖片)
-            </button>
-          </div>
-
-          {/* Selected Image Preview */}
-          {imageUrl && (
-            <div className="flex justify-center">
-              <div className="relative w-32 h-44 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800">
-                <img src={imageUrl} alt="Card Preview" className="w-full h-full object-contain bg-gray-50 dark:bg-[#1a1a1a]" />
-              </div>
-            </div>
-          )}
-
           {/* Title */}
           <div>
             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">徵求卡牌名稱 <span className="text-red-500">*</span></label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="flex-1 px-4 py-3 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 dark:text-white"
-                placeholder="例如：夢幻 VMAX SA"
-              />
-              <input 
-                type="file" 
-                accept="image/*" 
-                className="hidden" 
-                ref={fileInputRef}
-                onChange={handleAIImageSelect}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isAnalyzing}
-                className="flex flex-col items-center justify-center w-16 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-blue-100 dark:border-blue-500/20"
-              >
-                {isAnalyzing ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <Scan className="w-5 h-5 mb-0.5" />
-                    <span className="text-[10px] font-bold leading-none">AI 辨識</span>
-                  </>
-                )}
-              </button>
-            </div>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900 dark:text-white"
+              placeholder="例如：夢幻 VMAX SA"
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -288,11 +157,6 @@ export const CreateWant = () => {
           </div>
         </form>
       </motion.div>
-      <CardSearchModal 
-        isOpen={isSearchModalOpen} 
-        onClose={() => setIsSearchModalOpen(false)} 
-        onSelect={handleCardSelect} 
-      />
     </div>
   );
 };
