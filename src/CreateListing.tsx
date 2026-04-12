@@ -9,6 +9,7 @@ import { motion } from 'motion/react';
 import { CardSearchModal } from './components/CardSearchModal';
 import { SchemaType } from '@google/generative-ai';
 import { toast } from 'sonner';
+import { compressImage, compressBase64 } from './lib/imageUtils';
 
 export const CreateListing = () => {
   const { user } = useAuth();
@@ -28,15 +29,17 @@ export const CreateListing = () => {
 
   const CONDITIONS = ['Mint (M)', 'Near Mint (NM)', 'Lightly Played (LP)', 'Moderately Played (MP)', 'Heavily Played (HP)', 'Damaged', 'PSA 10', 'PSA 9', 'BGS 10', 'BGS 9.5'];
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressImage(file);
+        setImagePreview(compressedBase64);
+      } catch (error) {
+        console.error('Error handling image upload:', error);
+        toast.error('圖片處理失敗');
+      }
     }
   };
 
@@ -48,11 +51,13 @@ export const CreateListing = () => {
 
     setIsAnalyzing(true);
     try {
+      const compressedImage = await compressBase64(imagePreview);
+
       const response = await fetch('/api/ai/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          image: imagePreview,
+          image: compressedImage,
           prompt: 'Identify this Pokemon card. Return ONLY a valid JSON object with a single key "name" containing the Pokemon\'s name or character\'s name in Traditional Chinese or Japanese (e.g., {"name": "噴火龍"}). If you cannot identify it, return {"name": "Unknown"}. Do not include markdown formatting.',
           schema: {
             type: SchemaType.OBJECT,
@@ -65,11 +70,29 @@ export const CreateListing = () => {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || '辨識失敗');
+        let errorMessage = '辨識失敗';
+        try {
+          const text = await response.text();
+          try {
+            const errData = JSON.parse(text);
+            errorMessage = errData.error || errorMessage;
+          } catch (e) {
+            errorMessage = `伺服器錯誤 (${response.status}): ${text.substring(0, 100)}`;
+          }
+        } catch (e) {
+          errorMessage = `伺服器錯誤 (${response.status})`;
+        }
+        throw new Error(errorMessage);
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error("Invalid JSON response:", text);
+        throw new Error(`伺服器回傳了非預期的格式: ${text.substring(0, 100)}`);
+      }
 
       if (data && data.name && data.name !== "Unknown") {
         setTitle(data.name);

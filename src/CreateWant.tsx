@@ -8,6 +8,7 @@ import { motion } from 'motion/react';
 import { CardSearchModal } from './components/CardSearchModal';
 import { SchemaType } from '@google/generative-ai';
 import { toast } from 'sonner';
+import { compressImage } from './lib/imageUtils';
 
 export const CreateWant = () => {
   const { user } = useAuth();
@@ -34,12 +35,12 @@ export const CreateWant = () => {
     setIsSearchModalOpen(false);
   };
 
-  const handleAIImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAIImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result as string;
+      
+      try {
+        const compressedBase64 = await compressImage(file);
 
         setIsAnalyzing(true);
         try {
@@ -47,7 +48,7 @@ export const CreateWant = () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              image: base64,
+              image: compressedBase64,
               prompt: 'Identify this Pokemon card. Return ONLY a valid JSON object with a single key "name" containing the Pokemon\'s name or character\'s name in Traditional Chinese or Japanese (e.g., {"name": "噴火龍"}). If you cannot identify it, return {"name": "Unknown"}. Do not include markdown formatting.',
               schema: {
                 type: SchemaType.OBJECT,
@@ -60,17 +61,35 @@ export const CreateWant = () => {
           });
 
           if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || '辨識失敗');
+            let errorMessage = '辨識失敗';
+            try {
+              const text = await response.text();
+              try {
+                const errData = JSON.parse(text);
+                errorMessage = errData.error || errorMessage;
+              } catch (e) {
+                errorMessage = `伺服器錯誤 (${response.status}): ${text.substring(0, 100)}`;
+              }
+            } catch (e) {
+              errorMessage = `伺服器錯誤 (${response.status})`;
+            }
+            throw new Error(errorMessage);
           }
 
-          const data = await response.json();
+          const text = await response.text();
+          let data;
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            console.error("Invalid JSON response:", text);
+            throw new Error(`伺服器回傳了非預期的格式: ${text.substring(0, 100)}`);
+          }
 
           if (data && data.name && data.name !== "Unknown") {
             setTitle(data.name);
             toast.success(`AI 辨識成功：${data.name}`);
             // Optionally set it as the preview image for the want listing
-            setImageUrl(base64);
+            setImageUrl(compressedBase64);
             setSelectedCardId(null);
           } else {
             toast.error('無法辨識卡牌，請確保圖片清晰並重試');
@@ -83,8 +102,10 @@ export const CreateWant = () => {
           // reset input
           if (fileInputRef.current) fileInputRef.current.value = '';
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('Error handling AI image select:', error);
+        toast.error('圖片處理失敗');
+      }
     }
   };
 

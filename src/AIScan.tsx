@@ -5,6 +5,7 @@ import { X, Image as ImageIcon, Settings, Check, ChevronDown, Loader2, Camera, F
 import { motion, AnimatePresence } from 'motion/react';
 import { SchemaType } from '@google/generative-ai';
 import { toast } from 'sonner';
+import { compressImage, compressBase64 } from './lib/imageUtils';
 
 export const AIScan = () => {
   const navigate = useNavigate();
@@ -53,14 +54,16 @@ export const AIScan = () => {
     setScanResult(null);
   };
 
-  const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCapturedImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressImage(file);
+        setCapturedImage(compressedBase64);
+      } catch (error) {
+        console.error('Error handling gallery upload:', error);
+        toast.error('圖片處理失敗');
+      }
     }
   };
 
@@ -69,11 +72,14 @@ export const AIScan = () => {
     
     setIsAnalyzing(true);
     try {
+      // Ensure image is compressed before sending to avoid payload too large errors
+      const compressedImage = await compressBase64(capturedImage);
+
       const response = await fetch('/api/ai/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          image: capturedImage,
+          image: compressedImage,
           prompt: 'Identify this trading card. Find its card number. Use Google Search to find the recent eBay market value for this specific card in **PSA 10** condition, and convert it to Hong Kong Dollars (HKD). Return a JSON object. If you cannot identify the card, return "Unknown" for the name.',
           schema: {
             type: SchemaType.OBJECT,
@@ -88,11 +94,29 @@ export const AIScan = () => {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || '辨識失敗');
+        let errorMessage = '辨識失敗';
+        try {
+          const text = await response.text();
+          try {
+            const errData = JSON.parse(text);
+            errorMessage = errData.error || errorMessage;
+          } catch (e) {
+            errorMessage = `伺服器錯誤 (${response.status}): ${text.substring(0, 100)}`;
+          }
+        } catch (e) {
+          errorMessage = `伺服器錯誤 (${response.status})`;
+        }
+        throw new Error(errorMessage);
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error("Invalid JSON response:", text);
+        throw new Error(`伺服器回傳了非預期的格式: ${text.substring(0, 100)}`);
+      }
 
       if (data && data.name && data.name !== "Unknown") {
         toast.success(`AI 辨識成功：${data.name}`);
