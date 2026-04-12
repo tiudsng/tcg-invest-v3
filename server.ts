@@ -60,7 +60,8 @@ async function startServer() {
           responseMimeType: "application/json",
           responseSchema: schema
         } : undefined,
-        tools: [{ googleSearch: {} }]
+        // Tools (like googleSearch) are currently incompatible with responseMimeType: "application/json"
+        tools: schema ? undefined : [{ googleSearch: {} }]
       });
 
       const base64Data = image.split(",")[1] || image;

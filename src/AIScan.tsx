@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import { X, Image as ImageIcon, Settings, Check, ChevronDown, Loader2, Camera, FolderUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { SchemaType } from '@google/generative-ai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { toast } from 'sonner';
 import { compressImage, compressBase64 } from './lib/imageUtils';
 
@@ -86,51 +86,54 @@ export const AIScan = () => {
     
     setIsAnalyzing(true);
     try {
-      // Ensure image is compressed before sending to avoid payload too large errors
       const compressedImage = await compressBase64(capturedImage);
+      const base64Data = compressedImage.split(",")[1] || compressedImage;
+      const mimeType = compressedImage.split(";")[0].split(":")[1] || "image/jpeg";
 
-      const response = await fetch('/api/ai/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image: compressedImage,
-          prompt: 'Identify this trading card. Find its card number. Use Google Search to find the recent market value from SNKRDUNK for this specific card in both **PSA 10** condition and **RAW** (ungraded) condition. Convert the prices to Hong Kong Dollars (HKD). Return a JSON object. If you cannot identify the card, return "Unknown" for the name.',
-          schema: {
-            type: SchemaType.OBJECT,
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("請在設定中設定 GEMINI_API_KEY");
+      }
+
+      const ai = new GoogleGenAI({ apiKey: apiKey.trim().replace(/^["']|["']$/g, '') });
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          'Identify this trading card. Find its card number. Use Google Search to find the recent market value from SNKRDUNK for this specific card in both **PSA 10** condition and **RAW** (ungraded) condition. Convert the prices to Hong Kong Dollars (HKD). Return a JSON object. If you cannot identify the card, return "Unknown" for the name.',
+          {
+            inlineData: {
+              data: base64Data,
+              mimeType: mimeType
+            }
+          }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
             properties: {
-              name: { type: SchemaType.STRING, description: "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify." },
-              cardNumber: { type: SchemaType.STRING, description: "Card number (e.g., 201/165)" },
-              pricePsa10HKD: { type: SchemaType.NUMBER, description: "Estimated SNKRDUNK price for PSA 10 in HKD" },
-              priceRawHKD: { type: SchemaType.NUMBER, description: "Estimated SNKRDUNK price for RAW (ungraded) in HKD" }
+              name: { type: Type.STRING, description: "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify." },
+              cardNumber: { type: Type.STRING, description: "Card number (e.g., 201/165)" },
+              pricePsa10HKD: { type: Type.NUMBER, description: "Estimated SNKRDUNK price for PSA 10 in HKD" },
+              priceRawHKD: { type: Type.NUMBER, description: "Estimated SNKRDUNK price for RAW (ungraded) in HKD" }
             },
             required: ["name"]
           }
-        })
+        }
       });
 
-      if (!response.ok) {
-        let errorMessage = '辨識失敗';
-        try {
-          const text = await response.text();
-          try {
-            const errData = JSON.parse(text);
-            errorMessage = errData.error || errorMessage;
-          } catch (e) {
-            errorMessage = `伺服器錯誤 (${response.status}): ${text.substring(0, 100)}`;
-          }
-        } catch (e) {
-          errorMessage = `伺服器錯誤 (${response.status})`;
-        }
-        throw new Error(errorMessage);
+      const text = response.text;
+      if (!text) {
+        throw new Error("AI 未回傳任何內容");
       }
 
-      const text = await response.text();
       let data;
       try {
         data = JSON.parse(text);
       } catch (e) {
         console.error("Invalid JSON response:", text);
-        throw new Error(`伺服器回傳了非預期的格式: ${text.substring(0, 100)}`);
+        throw new Error(`伺服器回傳了非預期的格式`);
       }
 
       if (data && data.name && data.name !== "Unknown") {

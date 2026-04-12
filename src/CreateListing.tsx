@@ -7,7 +7,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebase';
 import { motion } from 'motion/react';
 import { CardSearchModal } from './components/CardSearchModal';
-import { SchemaType } from '@google/generative-ai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { toast } from 'sonner';
 import { compressImage, compressBase64 } from './lib/imageUtils';
 
@@ -52,46 +52,50 @@ export const CreateListing = () => {
     setIsAnalyzing(true);
     try {
       const compressedImage = await compressBase64(imagePreview);
+      const base64Data = compressedImage.split(",")[1] || compressedImage;
+      const mimeType = compressedImage.split(";")[0].split(":")[1] || "image/jpeg";
 
-      const response = await fetch('/api/ai/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image: compressedImage,
-          prompt: 'Identify this Pokemon card. Return ONLY a valid JSON object with a single key "name" containing the Pokemon\'s name or character\'s name in Traditional Chinese or Japanese (e.g., {"name": "噴火龍"}). If you cannot identify it, return {"name": "Unknown"}. Do not include markdown formatting.',
-          schema: {
-            type: SchemaType.OBJECT,
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("請在設定中設定 GEMINI_API_KEY");
+      }
+
+      const ai = new GoogleGenAI({ apiKey: apiKey.trim().replace(/^["']|["']$/g, '') });
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          'Identify this Pokemon card. Return ONLY a valid JSON object with a single key "name" containing the Pokemon\'s name or character\'s name in Traditional Chinese or Japanese (e.g., {"name": "噴火龍"}). If you cannot identify it, return {"name": "Unknown"}. Do not include markdown formatting.',
+          {
+            inlineData: {
+              data: base64Data,
+              mimeType: mimeType
+            }
+          }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
             properties: {
-              name: { type: SchemaType.STRING, description: "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify." }
+              name: { type: Type.STRING, description: "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify." }
             },
             required: ["name"]
           }
-        })
+        }
       });
 
-      if (!response.ok) {
-        let errorMessage = '辨識失敗';
-        try {
-          const text = await response.text();
-          try {
-            const errData = JSON.parse(text);
-            errorMessage = errData.error || errorMessage;
-          } catch (e) {
-            errorMessage = `伺服器錯誤 (${response.status}): ${text.substring(0, 100)}`;
-          }
-        } catch (e) {
-          errorMessage = `伺服器錯誤 (${response.status})`;
-        }
-        throw new Error(errorMessage);
+      const text = response.text;
+      if (!text) {
+        throw new Error("AI 未回傳任何內容");
       }
 
-      const text = await response.text();
       let data;
       try {
         data = JSON.parse(text);
       } catch (e) {
         console.error("Invalid JSON response:", text);
-        throw new Error(`伺服器回傳了非預期的格式: ${text.substring(0, 100)}`);
+        throw new Error(`伺服器回傳了非預期的格式`);
       }
 
       if (data && data.name && data.name !== "Unknown") {
