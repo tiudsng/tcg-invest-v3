@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { collection, query, orderBy, where, doc, setDoc, arrayUnion, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db } from './firebase';
 import { Listing, WantListing, PortfolioItem } from './types';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { Search, BookOpen, ChevronRight, ChevronLeft, Clock, ShoppingBag, PlusCircle, Camera, Star, Repeat, Calendar, Filter, X, Image as ImageIcon, Briefcase, Loader2, RefreshCw, TrendingUp, Zap, Pencil, Flame, Sparkles } from 'lucide-react';
@@ -172,6 +172,7 @@ const ListArticle = ({ article, onEdit }: { article: any, onEdit?: (id: string, 
 export const Home: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [localArticles, setLocalArticles] = useState<any[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [wantListings, setWantListings] = useState<WantListing[]>([]);
@@ -322,6 +323,21 @@ export const Home: React.FC = () => {
     fetchListings(true);
     fetchWants(true);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const q = params.get('q');
+    if (q) {
+      setSearchQuery(q);
+      // Optional: scroll to listings section
+      setTimeout(() => {
+        const element = document.getElementById('listings-section');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 500);
+    }
+  }, [location.search]);
 
   const isFiltering = searchQuery.length > 0 || filters.conditions.length > 0 || filters.cardTypes.length > 0 || filters.minPrice !== '' || filters.maxPrice !== '';
 

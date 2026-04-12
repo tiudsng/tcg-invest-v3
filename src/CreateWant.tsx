@@ -42,9 +42,8 @@ export const CreateWant = () => {
         const base64 = reader.result as string;
         setIsAnalyzing(true);
         try {
-          const match = base64.match(/^data:(image\/\w+);base64,/);
-          const mimeType = match ? match[1] : "image/jpeg";
-          const base64Data = base64.replace(/^data:image\/\w+;base64,/, "");
+          const base64Data = base64.split(',')[1];
+          const mimeType = base64.split(';')[0].split(':')[1] || 'image/jpeg';
 
           const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
           const response = await ai.models.generateContent({
@@ -53,7 +52,7 @@ export const CreateWant = () => {
               {
                 role: "user",
                 parts: [
-                  { text: 'Identify this Pokemon card. Return ONLY a valid JSON object with a single key "name" containing the Pokemon\'s name or character\'s name in Traditional Chinese or Japanese (e.g., {"name": "噴火龍"}). Do not include markdown formatting like ```json.' },
+                  { text: 'Identify this Pokemon card. Return ONLY a valid JSON object with a single key "name" containing the Pokemon\'s name or character\'s name in Traditional Chinese or Japanese (e.g., {"name": "噴火龍"}). If you cannot identify it, return {"name": "Unknown"}. Do not include markdown formatting.' },
                   { inlineData: { data: base64Data, mimeType: mimeType } }
                 ]
               }
@@ -63,21 +62,31 @@ export const CreateWant = () => {
           const text = response.text;
           if (!text) throw new Error("No text returned from AI");
 
-          const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-          const data = JSON.parse(cleanedText);
+          let data;
+          try {
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              data = JSON.parse(jsonMatch[0]);
+            } else {
+              data = JSON.parse(text.replace(/```json/g, "").replace(/```/g, "").trim());
+            }
+          } catch (e) {
+            console.error("Failed to parse JSON:", text);
+            throw new Error("Invalid JSON format from AI");
+          }
 
-          if (data && data.name) {
+          if (data && data.name && data.name !== "Unknown") {
             setTitle(data.name);
             toast.success(`AI 辨識成功：${data.name}`);
             // Optionally set it as the preview image for the want listing
             setImageUrl(base64);
             setSelectedCardId(null);
           } else {
-            toast.error('無法辨識卡牌');
+            toast.error('無法辨識卡牌，請確保圖片清晰並重試');
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error('AI Error:', err);
-          toast.error('AI 辨識失敗');
+          toast.error(`AI 辨識失敗: ${err.message || '未知錯誤'}`);
         } finally {
           setIsAnalyzing(false);
           // reset input

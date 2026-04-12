@@ -1,9 +1,9 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
-import { X, Image as ImageIcon, Settings, Check, ChevronDown, Loader2 } from 'lucide-react';
+import { X, Image as ImageIcon, Settings, Check, ChevronDown, Loader2, Camera, FolderUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { toast } from 'sonner';
 
 export const AIScan = () => {
@@ -12,6 +12,7 @@ export const AIScan = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [scanResult, setScanResult] = useState<{name: string, cardNumber?: string, priceHKD?: number} | null>(null);
   const [gameSelection, setGameSelection] = useState('Trading Card Games');
 
   const videoConstraints = {
@@ -27,6 +28,7 @@ export const AIScan = () => {
 
   const handleRetake = () => {
     setCapturedImage(null);
+    setScanResult(null);
   };
 
   const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,41 +47,51 @@ export const AIScan = () => {
     
     setIsAnalyzing(true);
     try {
-      const match = capturedImage.match(/^data:(image\/\w+);base64,/);
-      const mimeType = match ? match[1] : "image/jpeg";
-      const base64Data = capturedImage.replace(/^data:image\/\w+;base64,/, "");
+      const base64Data = capturedImage.split(',')[1];
+      const mimeType = capturedImage.split(';')[0].split(':')[1] || 'image/jpeg';
 
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-pro-preview",
         contents: [
           {
             role: "user",
             parts: [
-              { text: 'Identify this trading card. Return ONLY a valid JSON object with a single key "name" containing the card\'s name or character\'s name in Traditional Chinese or Japanese (e.g., {"name": "噴火龍"}). Do not include markdown formatting like ```json.' },
+              { text: 'Identify this trading card. Find its card number. Use Google Search to find the recent eBay market value for this specific card in **PSA 10** condition, and convert it to Hong Kong Dollars (HKD). Return a JSON object. If you cannot identify the card, return "Unknown" for the name.' },
               { inlineData: { data: base64Data, mimeType: mimeType } }
             ]
           }
-        ]
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING, description: "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify." },
+              cardNumber: { type: Type.STRING, description: "Card number (e.g., 201/165)" },
+              priceHKD: { type: Type.NUMBER, description: "Estimated eBay price for PSA 10 in HKD" }
+            },
+            required: ["name"]
+          },
+          tools: [{ googleSearch: {} }]
+        }
       });
 
       const text = response.text;
       if (!text) throw new Error("No text returned from AI");
 
-      const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-      const data = JSON.parse(cleanedText);
+      const data = JSON.parse(text);
 
-      if (data && data.name) {
+      if (data && data.name && data.name !== "Unknown") {
         toast.success(`AI 辨識成功：${data.name}`);
-        // Navigate to search or create listing with the identified name
-        navigate(`/search?q=${encodeURIComponent(data.name)}`);
+        setScanResult(data);
       } else {
-        toast.error('無法辨識卡牌');
+        toast.error('無法辨識卡牌，請確保圖片清晰並重試');
         setCapturedImage(null);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('AI Error:', err);
-      toast.error('AI 辨識失敗');
+      toast.error(`AI 辨識失敗: ${err.message || '未知錯誤'}`);
       setCapturedImage(null);
     } finally {
       setIsAnalyzing(false);
@@ -87,26 +99,9 @@ export const AIScan = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col font-sans">
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex justify-between items-center p-4 pt-safe">
-        <button 
-          onClick={() => navigate(-1)}
-          className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-black hover:bg-gray-200 transition-colors"
-        >
-          <X className="w-6 h-6" />
-        </button>
-        
-        <button className="flex items-center gap-2 text-white font-semibold text-lg drop-shadow-md">
-          {gameSelection}
-          <ChevronDown className="w-5 h-5" />
-        </button>
-        
-        <div className="w-10 h-10" /> {/* Spacer for centering */}
-      </div>
-
-      {/* Camera / Preview Area */}
-      <div className="flex-1 relative overflow-hidden flex flex-col items-center justify-center bg-zinc-900">
+    <div className="fixed inset-0 z-40 bg-black flex flex-col font-sans">
+      {/* Camera / Preview Area - Takes remaining space */}
+      <div className="flex-1 relative overflow-hidden bg-black">
         {capturedImage ? (
           <img src={capturedImage} alt="Captured" className="absolute inset-0 w-full h-full object-cover" />
         ) : (
@@ -121,8 +116,8 @@ export const AIScan = () => {
 
         {/* Scanning Frame Overlay */}
         {!capturedImage && (
-          <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center px-6 pb-20">
-            <div className="w-full max-w-md aspect-[3/4] border-2 border-white/90 rounded-3xl relative shadow-[0_0_0_4000px_rgba(0,0,0,0.4)]">
+          <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center px-8">
+            <div className="w-full max-w-sm aspect-[63/88] border-2 border-white rounded-3xl relative shadow-[0_0_0_4000px_rgba(0,0,0,0.4)]">
             </div>
           </div>
         )}
@@ -134,39 +129,96 @@ export const AIScan = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-30"
+              className="absolute inset-0 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center z-30"
             >
-              <Loader2 className="w-12 h-12 text-white animate-spin mb-4" />
+              <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
               <p className="text-white font-semibold text-lg tracking-wider">AI 辨識中...</p>
+              <p className="text-white/60 text-sm mt-2">正在搜尋最新市場價格</p>
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Header - Floating inside camera area */}
+        <div className="absolute top-0 left-0 right-0 z-20 flex justify-between items-center p-4 pt-safe bg-gradient-to-b from-black/50 to-transparent">
+          <button 
+            onClick={() => navigate(-1)}
+            className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-black hover:bg-gray-200 transition-colors shadow-lg"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          
+          <div className="w-10 h-10" /> {/* Spacer for centering */}
+        </div>
       </div>
 
-      {/* Bottom Controls */}
-      <div className="bg-[#2c2422] rounded-t-3xl pb-safe relative z-20 -mt-6 shadow-[0_-10px_40px_rgba(0,0,0,0.3)]">
-        <div className="p-6">
-          {!capturedImage ? (
-            <div className="bg-[#1c1c1e] text-white px-6 py-4 rounded-xl mb-6 flex items-center justify-center">
-              <p className="text-[15px]">Scan the <span className="text-teal-400 font-medium">front</span> of the card to get started.</p>
+      {/* Bottom Controls - Dark Panel */}
+      <div className="bg-black p-6 pb-[100px] relative z-20 flex-shrink-0">
+        {scanResult ? (
+          <motion.div 
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-2xl font-bold text-white mb-1">{scanResult.name}</h3>
+                {scanResult.cardNumber && <p className="text-gray-400 font-medium">{scanResult.cardNumber}</p>}
+              </div>
+              <button onClick={() => {setScanResult(null); setCapturedImage(null);}} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          ) : (
-             <div className="bg-[#1c1c1e] text-white px-6 py-4 rounded-xl mb-6 flex items-center justify-center">
-              <p className="text-[15px]">確認圖片清晰後，點擊右下角按鈕進行辨識。</p>
+            
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-6">
+              <p className="text-blue-400 text-sm font-medium mb-1">eBay PSA 10 預估市值</p>
+              <p className="text-3xl font-bold text-white">
+                {scanResult.priceHKD ? `HK$${scanResult.priceHKD.toLocaleString()}` : '暫無資料'}
+              </p>
             </div>
-          )}
 
-          <div className="flex justify-end mb-4">
-            <span className="text-teal-400 text-sm font-medium">Total: <span className="text-white">$0.00</span></span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-              >
-                <ImageIcon className="w-7 h-7" />
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => navigate(`/?q=${encodeURIComponent(scanResult.name)}`)} className="py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-colors">
+                在市集搜尋
+              </button>
+              <button onClick={() => navigate(`/create?q=${encodeURIComponent(scanResult.name)}`)} className="py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-colors">
+                我要賣這張
+              </button>
+            </div>
+          </motion.div>
+        ) : capturedImage ? (
+           <div className="flex flex-col gap-4">
+              <div className="bg-[#3a3a3c] text-white px-6 py-4 rounded-[20px] flex items-center justify-center">
+                <p className="text-[15px] font-medium">確認圖片清晰後，點擊開始辨識。</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={handleRetake}
+                  className="py-4 rounded-[20px] bg-[#3a3a3c] flex items-center justify-center text-white font-semibold hover:bg-[#4a4a4c] transition-colors"
+                >
+                  重拍
+                </button>
+                <button 
+                  onClick={handleAnalyze}
+                  className="py-4 rounded-[20px] bg-blue-600 flex items-center justify-center text-white font-semibold hover:bg-blue-500 transition-colors"
+                  disabled={isAnalyzing}
+                >
+                  {isAnalyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : '開始辨識'}
+                </button>
+              </div>
+           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-4 mb-4 mt-2">
+              <button onClick={capture} className="flex flex-col items-center justify-center gap-2">
+                <div className="w-[72px] h-[72px] bg-[#2c2c2e] rounded-[24px] flex items-center justify-center shadow-sm active:scale-95 transition-transform">
+                  <Camera className="w-7 h-7 text-white" strokeWidth={1.5} />
+                </div>
+                <span className="text-white font-semibold text-[13px]">Take Photo</span>
+              </button>
+              <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center gap-2">
+                <div className="w-[72px] h-[72px] bg-[#2c2c2e] rounded-[24px] flex items-center justify-center shadow-sm active:scale-95 transition-transform">
+                  <FolderUp className="w-7 h-7 text-white" strokeWidth={1.5} />
+                </div>
+                <span className="text-white font-semibold text-[13px]">Local Upload</span>
                 <input 
                   type="file" 
                   ref={fileInputRef} 
@@ -175,39 +227,9 @@ export const AIScan = () => {
                   onChange={handleGalleryUpload} 
                 />
               </button>
-              
-              {!capturedImage && (
-                <button className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
-                  <Settings className="w-6 h-6" />
-                </button>
-              )}
             </div>
-
-            {capturedImage ? (
-              <div className="flex items-center gap-6 absolute left-1/2 -translate-x-1/2">
-                <button 
-                  onClick={handleRetake}
-                  className="px-6 py-3 rounded-full bg-white/10 flex items-center justify-center text-white font-semibold hover:bg-white/20 transition-colors"
-                >
-                  重拍
-                </button>
-              </div>
-            ) : (
-              <button 
-                onClick={capture}
-                className="w-20 h-20 rounded-full bg-white absolute left-1/2 -translate-x-1/2 active:scale-95 transition-transform"
-              />
-            )}
-
-            <button 
-              onClick={capturedImage ? handleAnalyze : undefined}
-              className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${capturedImage ? 'bg-white text-black hover:bg-gray-200' : 'bg-white/10 text-gray-400'}`}
-              disabled={!capturedImage || isAnalyzing}
-            >
-              {isAnalyzing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Check className="w-7 h-7" />}
-            </button>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );
