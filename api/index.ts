@@ -51,7 +51,8 @@ app.post("/api/ai/analyze", async (req, res) => {
       generationConfig: schema ? {
         responseMimeType: "application/json",
         responseSchema: schema
-      } : undefined
+      } : undefined,
+      tools: [{ googleSearch: {} }]
     });
 
     const base64Data = image.split(",")[1] || image;

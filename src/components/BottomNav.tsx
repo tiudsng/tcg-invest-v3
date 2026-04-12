@@ -25,8 +25,7 @@ export const BottomNav = () => {
     '/create-want',
     '/edit-listing/',
     '/edit-want/',
-    '/auth',
-    '/ai-scan'
+    '/auth'
   ];
 
   const shouldHide = hideOnPaths.some(path => location.pathname.startsWith(path));
