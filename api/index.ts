@@ -39,7 +39,7 @@ app.post("/api/ai/analyze", async (req, res) => {
       return res.status(400).json({ error: "No image provided" });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY?.trim().replace(/^["']|["']$/g, '');
     if (!apiKey) {
       console.error("Gemini API Key not configured on server");
       return res.status(500).json({ error: "Gemini API Key not configured on server" });
@@ -47,11 +47,12 @@ app.post("/api/ai/analyze", async (req, res) => {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       generationConfig: schema ? {
         responseMimeType: "application/json",
         responseSchema: schema
-      } : undefined
+      } : undefined,
+      tools: [{ googleSearch: {} }]
     });
 
     const base64Data = image.split(",")[1] || image;

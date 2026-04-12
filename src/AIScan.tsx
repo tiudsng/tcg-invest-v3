@@ -24,8 +24,22 @@ export const AIScan = () => {
   };
 
   const handleCameraError = (error: string | DOMException) => {
-    console.error('Webcam Error:', error);
-    setCameraError(typeof error === 'string' ? error : error.message);
+    const errorMessage = typeof error === 'string' ? error : error.message;
+    
+    if (errorMessage.includes('Requested device not found') || errorMessage.includes('NotFoundError') || errorMessage.includes('NotAllowedError') || errorMessage.includes('Permission denied')) {
+      console.warn('Webcam Warning:', errorMessage);
+    } else {
+      console.error('Webcam Error:', error);
+    }
+    
+    // Automatically fallback to basic constraints if we were trying 'environment'
+    if (!useBasicConstraints && (errorMessage.includes('Requested device not found') || errorMessage.includes('OverconstrainedError') || errorMessage.includes('NotFoundError'))) {
+      console.log('Falling back to basic camera constraints...');
+      setUseBasicConstraints(true);
+      return;
+    }
+    
+    setCameraError(errorMessage);
   };
 
   const tryBasicCamera = () => {
@@ -80,13 +94,14 @@ export const AIScan = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           image: compressedImage,
-          prompt: 'Identify this trading card. Find its card number. Use Google Search to find the recent eBay market value for this specific card in **PSA 10** condition, and convert it to Hong Kong Dollars (HKD). Return a JSON object. If you cannot identify the card, return "Unknown" for the name.',
+          prompt: 'Identify this trading card. Find its card number. Use Google Search to find the recent market value from SNKRDUNK for this specific card in both **PSA 10** condition and **RAW** (ungraded) condition. Convert the prices to Hong Kong Dollars (HKD). Return a JSON object. If you cannot identify the card, return "Unknown" for the name.',
           schema: {
             type: SchemaType.OBJECT,
             properties: {
               name: { type: SchemaType.STRING, description: "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify." },
               cardNumber: { type: SchemaType.STRING, description: "Card number (e.g., 201/165)" },
-              priceHKD: { type: SchemaType.NUMBER, description: "Estimated eBay price for PSA 10 in HKD" }
+              pricePsa10HKD: { type: SchemaType.NUMBER, description: "Estimated SNKRDUNK price for PSA 10 in HKD" },
+              priceRawHKD: { type: SchemaType.NUMBER, description: "Estimated SNKRDUNK price for RAW (ungraded) in HKD" }
             },
             required: ["name"]
           }
@@ -143,6 +158,7 @@ export const AIScan = () => {
         ) : (
           <>
             <Webcam
+              key={useBasicConstraints ? 'basic' : 'env'}
               audio={false}
               ref={webcamRef}
               screenshotFormat="image/jpeg"
@@ -151,26 +167,27 @@ export const AIScan = () => {
               className="absolute inset-0 w-full h-full object-cover"
             />
             {cameraError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 px-6 text-center">
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 px-6 text-center z-10">
                 <Settings className="w-12 h-12 text-gray-500 mb-4" />
                 <p className="text-white font-bold mb-2">無法啟動相機</p>
-                <p className="text-gray-400 text-sm mb-6">{cameraError}</p>
+                <p className="text-gray-400 text-sm mb-6">
+                  {cameraError.includes('Requested device not found') || cameraError.includes('NotFoundError') 
+                    ? '找不到可用的相機設備，請確認您的裝置是否有相機，或直接從相簿上傳圖片。' 
+                    : cameraError.includes('NotAllowedError') || cameraError.includes('Permission denied')
+                    ? '無法存取相機，請在瀏覽器設定中允許相機權限，或直接從相簿上傳圖片。'
+                    : cameraError}
+                </p>
                 <div className="flex flex-col gap-3 w-full max-w-xs">
                   <button 
-                    onClick={tryBasicCamera}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold active:scale-95 transition-transform"
-                  >
-                    嘗試預設相機
-                  </button>
-                  <button 
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-6 py-3 bg-white/10 text-white rounded-xl font-bold active:scale-95 transition-transform"
+                    className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold active:scale-95 transition-transform flex items-center justify-center gap-2"
                   >
+                    <FolderUp className="w-5 h-5" />
                     從相簿上傳
                   </button>
                   <button 
                     onClick={() => window.location.reload()}
-                    className="px-6 py-3 bg-white/5 text-white/60 rounded-xl font-bold active:scale-95 transition-transform"
+                    className="px-6 py-3 bg-white/10 text-white rounded-xl font-bold active:scale-95 transition-transform"
                   >
                     重新整理頁面
                   </button>
@@ -181,7 +198,7 @@ export const AIScan = () => {
         )}
 
         {/* Scanning Frame Overlay */}
-        {!capturedImage && (
+        {!capturedImage && !cameraError && (
           <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center px-8">
             <div className="w-full max-w-sm aspect-[63/88] border-2 border-white rounded-3xl relative shadow-[0_0_0_4000px_rgba(0,0,0,0.4)]">
             </div>
@@ -218,7 +235,7 @@ export const AIScan = () => {
       </div>
 
       {/* Bottom Controls - Dark Panel */}
-      <div className="bg-black p-6 pb-[100px] relative z-20 flex-shrink-0">
+      <div className="bg-black px-6 pt-4 pb-[88px] relative z-20 flex-shrink-0">
         {scanResult ? (
           <motion.div 
             initial={{ y: 20, opacity: 0 }}
@@ -234,11 +251,19 @@ export const AIScan = () => {
               </button>
             </div>
             
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-6">
-              <p className="text-blue-400 text-sm font-medium mb-1">eBay PSA 10 預估市值</p>
-              <p className="text-3xl font-bold text-white">
-                {scanResult.priceHKD ? `HK$${scanResult.priceHKD.toLocaleString()}` : '暫無資料'}
-              </p>
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+                <p className="text-blue-400 text-xs font-medium mb-1">SNKRDUNK PSA 10 預估</p>
+                <p className="text-2xl font-bold text-white">
+                  {scanResult.pricePsa10HKD ? `HK$${scanResult.pricePsa10HKD.toLocaleString()}` : '暫無資料'}
+                </p>
+              </div>
+              <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
+                <p className="text-purple-400 text-xs font-medium mb-1">SNKRDUNK RAW 預估</p>
+                <p className="text-2xl font-bold text-white">
+                  {scanResult.priceRawHKD ? `HK$${scanResult.priceRawHKD.toLocaleString()}` : '暫無資料'}
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -273,18 +298,18 @@ export const AIScan = () => {
            </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 mb-4 mt-2">
+            <div className="grid grid-cols-2 gap-4 mt-2">
               <button onClick={capture} className="flex flex-col items-center justify-center gap-2">
                 <div className="w-[72px] h-[72px] bg-[#2c2c2e] rounded-[24px] flex items-center justify-center shadow-sm active:scale-95 transition-transform">
                   <Camera className="w-7 h-7 text-white" strokeWidth={1.5} />
                 </div>
-                <span className="text-white font-semibold text-[13px]">Take Photo</span>
+                <span className="text-white font-semibold text-[13px]">拍照</span>
               </button>
               <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center gap-2">
                 <div className="w-[72px] h-[72px] bg-[#2c2c2e] rounded-[24px] flex items-center justify-center shadow-sm active:scale-95 transition-transform">
                   <FolderUp className="w-7 h-7 text-white" strokeWidth={1.5} />
                 </div>
-                <span className="text-white font-semibold text-[13px]">Local Upload</span>
+                <span className="text-white font-semibold text-[13px]">從相簿上傳</span>
                 <input 
                   type="file" 
                   ref={fileInputRef} 

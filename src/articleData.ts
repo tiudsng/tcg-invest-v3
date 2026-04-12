@@ -1,38 +1,5 @@
 export const ARTICLES = [
   {
-    id: "1",
-    title: "🔥本週卡價升幅榜 (AI 監控)",
-    excerpt: "分析本週市場波動最大的卡牌。",
-    category: "文章 1 區",
-    readTime: "閱讀時間 · 2026/3月1日",
-    imageUrl: "https://placehold.co/800x400/1c1c1e/aaaaaa?text=Chart+Image",
-    featured: true,
-    isList: false,
-    zone: 1
-  },
-  {
-    id: "2",
-    title: "新卡包：吉黑雅 (Clefairy) 預測價值",
-    excerpt: "最新擴充包分析",
-    category: "文章 2 區",
-    readTime: "3 min",
-    imageUrl: "https://placehold.co/400x300/ffb6c1/ffffff?text=Clefairy+Pack",
-    featured: false,
-    isList: false,
-    zone: 2
-  },
-  {
-    id: "3",
-    title: "卡市趨勢分析：噴火龍",
-    excerpt: "噴火龍價格走勢",
-    category: "文章 3 區",
-    readTime: "4 min",
-    imageUrl: "https://placehold.co/400x300/3a2218/ffffff?text=Charizard",
-    featured: false,
-    isList: false,
-    zone: 3
-  },
-  {
     id: "4",
     title: "收藏家聖杯：為什麼初版噴火龍能賣出天價？",
     excerpt: "深入探討初版噴火龍的歷史與價值。",

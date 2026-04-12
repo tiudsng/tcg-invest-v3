@@ -551,62 +551,61 @@ export const Home: React.FC = () => {
 
       <PriceLeaderboard />
 
-      <div className="mb-12 sm:mb-20">
-        <div className="flex items-center justify-between mb-4 sm:mb-10">
-          <h2 className="text-xl sm:text-3xl font-semibold text-gray-900 dark:text-white flex items-center gap-2 sm:gap-3 tracking-tight">
-            <BookOpen className="w-5 h-5 sm:w-8 sm:h-8 text-blue-600" />
-            收藏家指南 🚀
-          </h2>
-          <Link to="/articles" className="text-sm sm:text-lg text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1 hover:gap-2 transition-all">
-            查看全部 <ChevronRight className="w-5 h-5" />
-          </Link>
+      {localArticles.length > 0 && (
+        <div className="mb-12 sm:mb-20">
+          <div className="flex items-center justify-between mb-4 sm:mb-10">
+            <h2 className="text-xl sm:text-3xl font-semibold text-gray-900 dark:text-white flex items-center gap-2 sm:gap-3 tracking-tight">
+              <BookOpen className="w-5 h-5 sm:w-8 sm:h-8 text-blue-600" />
+              收藏家指南 🚀
+            </h2>
+            <Link to="/articles" className="text-sm sm:text-lg text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1 hover:gap-2 transition-all">
+              查看全部 <ChevronRight className="w-5 h-5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6 max-w-6xl mx-auto w-full">
+            {loading ? (
+              [...Array(3)].map((_, i) => <ArticleSkeleton key={i} />)
+            ) : (
+              <>
+                {/* 文章 1 區 (Large Slot) */}
+                <div className="lg:col-span-2 h-full">
+                  {(() => {
+                    const article1 = localArticles.find(a => a.zone === 1) || localArticles[0];
+                    return article1 ? (
+                      <div className="h-full">
+                        <FeaturedArticle article={article1} isLarge onEdit={handleArticleEdit} />
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+                
+                {/* 文章 2 區 & 3 區 (Small Slots) */}
+                <div className="lg:col-span-1 grid grid-cols-2 lg:flex lg:flex-col gap-3 sm:gap-6 h-full">
+                  {(() => {
+                    const article1 = localArticles.find(a => a.zone === 1) || localArticles[0];
+                    const article2 = localArticles.find(a => a.zone === 2 && a.id !== article1?.id) || localArticles.find(a => a.id !== article1?.id);
+                    return article2 ? (
+                      <div className="flex-1">
+                        <FeaturedArticle article={article2} onEdit={handleArticleEdit} />
+                      </div>
+                    ) : null;
+                  })()}
+                  {(() => {
+                    const article1 = localArticles.find(a => a.zone === 1) || localArticles[0];
+                    const article2 = localArticles.find(a => a.zone === 2 && a.id !== article1?.id) || localArticles.find(a => a.id !== article1?.id);
+                    const article3 = localArticles.find(a => a.zone === 3 && a.id !== article1?.id && a.id !== article2?.id) || localArticles.find(a => a.id !== article1?.id && a.id !== article2?.id);
+                    return article3 ? (
+                      <div className="flex-1">
+                        <FeaturedArticle article={article3} onEdit={handleArticleEdit} />
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6 max-w-6xl mx-auto w-full">
-          {loading ? (
-            [...Array(3)].map((_, i) => <ArticleSkeleton key={i} />)
-          ) : (
-            <>
-              {/* 文章 1 區 (Large Slot) */}
-              <div className="lg:col-span-2 h-full">
-                {(() => {
-                  const article1 = localArticles.find(a => a.zone === 1 || a.category?.includes('文章 1 區') || a.category?.includes('文章1區')) || localArticles[0];
-                  return article1 ? (
-                    <div className="h-full">
-                      <FeaturedArticle article={article1} isLarge onEdit={handleArticleEdit} />
-                    </div>
-                  ) : null;
-                })()}
-              </div>
-              
-              {/* 文章 2 區 & 3 區 (Small Slots) */}
-              <div className="lg:col-span-1 grid grid-cols-2 lg:flex lg:flex-col gap-3 sm:gap-6 h-full">
-                {(() => {
-                  const article1 = localArticles.find(a => a.zone === 1 || a.category?.includes('文章 1 區') || a.category?.includes('文章1區')) || localArticles[0];
-                  const article2 = localArticles.find(a => (a.zone === 2 || a.category?.includes('文章 2 區') || a.category?.includes('文章2區')) && a.id !== article1?.id) 
-                                   || localArticles.find(a => a.id !== article1?.id);
-                  return article2 ? (
-                    <div className="flex-1">
-                      <FeaturedArticle article={article2} onEdit={handleArticleEdit} />
-                    </div>
-                  ) : null;
-                })()}
-                {(() => {
-                  const article1 = localArticles.find(a => a.zone === 1 || a.category?.includes('文章 1 區') || a.category?.includes('文章1區')) || localArticles[0];
-                  const article2 = localArticles.find(a => (a.zone === 2 || a.category?.includes('文章 2 區') || a.category?.includes('文章2區')) && a.id !== article1?.id) 
-                                   || localArticles.find(a => a.id !== article1?.id);
-                  const article3 = localArticles.find(a => (a.zone === 3 || a.category?.includes('文章 3 區') || a.category?.includes('文章3區')) && a.id !== article1?.id && a.id !== article2?.id)
-                                   || localArticles.find(a => a.id !== article1?.id && a.id !== article2?.id);
-                  return article3 ? (
-                    <div className="flex-1">
-                      <FeaturedArticle article={article3} onEdit={handleArticleEdit} />
-                    </div>
-                  ) : null;
-                })()}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+      )}
 
       <div className="flex items-center justify-between mb-6 sm:mb-10 scroll-mt-32" id="listings-section">
         <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">最新上架</h2>
