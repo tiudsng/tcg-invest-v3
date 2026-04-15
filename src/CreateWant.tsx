@@ -47,7 +47,11 @@ export const CreateWant = () => {
           const base64Data = compressedBase64.split(",")[1] || compressedBase64;
           const mimeType = compressedBase64.split(";")[0].split(":")[1] || "image/jpeg";
 
-          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+          const apiKey = process.env.GEMINI_API_KEY;
+          if (!apiKey) {
+            throw new Error("請在設定 (Settings) 中設定 GEMINI_API_KEY");
+          }
+          const ai = new GoogleGenAI({ apiKey });
           
           const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
