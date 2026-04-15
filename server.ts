@@ -37,61 +37,6 @@ async function startServer() {
     }
   });
 
-  // AI Analysis route
-  app.post("/api/ai/analyze", async (req, res) => {
-    console.log("AI Analysis request received");
-    try {
-      const { image, prompt, schema } = req.body;
-      if (!image) {
-        console.error("No image provided in request");
-        return res.status(400).json({ error: "No image provided" });
-      }
-
-      const apiKey = process.env.GEMINI_API_KEY?.trim().replace(/^["']|["']$/g, '');
-      if (!apiKey) {
-        console.error("Gemini API Key not configured on server");
-        return res.status(500).json({ error: "Gemini API Key not configured on server" });
-      }
-
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-2.5-flash",
-        generationConfig: schema ? {
-          responseMimeType: "application/json",
-          responseSchema: schema
-        } : undefined,
-        // Tools (like googleSearch) are currently incompatible with responseMimeType: "application/json"
-        tools: schema ? undefined : [{ googleSearch: {} }]
-      });
-
-      const base64Data = image.split(",")[1] || image;
-      const mimeType = image.split(";")[0].split(":")[1] || "image/jpeg";
-
-      console.log("Calling Gemini API...");
-      const result = await model.generateContent([
-        prompt || "Identify this trading card.",
-        {
-          inlineData: {
-            data: base64Data,
-            mimeType: mimeType
-          }
-        }
-      ]);
-
-      const text = result.response.text();
-      console.log("Gemini API response received:", text);
-      
-      try {
-        res.json(JSON.parse(text));
-      } catch (e) {
-        res.json({ text });
-      }
-    } catch (error: any) {
-      console.error("AI Analysis Error:", error);
-      res.status(500).json({ error: error.message || "AI Analysis failed" });
-    }
-  });
-
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

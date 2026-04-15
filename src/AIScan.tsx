@@ -13,7 +13,7 @@ export const AIScan = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [scanResult, setScanResult] = useState<{name: string, cardNumber?: string, priceHKD?: number} | null>(null);
+  const [scanResult, setScanResult] = useState<{name: string, cardNumber?: string, pricePsa10HKD?: number, priceRawHKD?: number} | null>(null);
   const [gameSelection, setGameSelection] = useState('Trading Card Games');
   const [cameraError, setCameraError] = useState<string | null>(null);
 
@@ -90,17 +90,25 @@ export const AIScan = () => {
       const base64Data = compressedImage.split(",")[1] || compressedImage;
       const mimeType = compressedImage.split(";")[0].split(":")[1] || "image/jpeg";
 
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error("請在設定中設定 GEMINI_API_KEY");
-      }
-
-      const ai = new GoogleGenAI({ apiKey: apiKey.trim().replace(/^["']|["']$/g, '') });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: [
-          'Identify this trading card. Find its card number. Use Google Search to find the recent market value from SNKRDUNK for this specific card in both **PSA 10** condition and **RAW** (ungraded) condition. Convert the prices to Hong Kong Dollars (HKD). Return a JSON object. If you cannot identify the card, return "Unknown" for the name.',
+          `Identify this trading card from the image. 
+          1. Find its exact card name and card number (e.g., 201/165).
+          2. CRITICAL: You MUST use the Google Search tool to search for the real, current market value of this specific card (using the name and card number) on SNKRDUNK or other reliable TCG market websites.
+          3. Find the price for both **PSA 10** condition and **RAW** (ungraded) condition.
+          4. Convert the prices to Hong Kong Dollars (HKD) as a number.
+          
+          You MUST return ONLY a valid JSON object without any markdown formatting or code blocks.
+          The JSON must have this exact structure:
+          {
+            "name": "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify.",
+            "cardNumber": "Card number (e.g., 201/165)",
+            "pricePsa10HKD": 1500,
+            "priceRawHKD": 500
+          }`,
           {
             inlineData: {
               data: base64Data,
@@ -109,17 +117,7 @@ export const AIScan = () => {
           }
         ],
         config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING, description: "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify." },
-              cardNumber: { type: Type.STRING, description: "Card number (e.g., 201/165)" },
-              pricePsa10HKD: { type: Type.NUMBER, description: "Estimated SNKRDUNK price for PSA 10 in HKD" },
-              priceRawHKD: { type: Type.NUMBER, description: "Estimated SNKRDUNK price for RAW (ungraded) in HKD" }
-            },
-            required: ["name"]
-          }
+          tools: [{ googleSearch: {} }]
         }
       });
 
@@ -130,7 +128,8 @@ export const AIScan = () => {
 
       let data;
       try {
-        data = JSON.parse(text);
+        const cleanText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        data = JSON.parse(cleanText);
       } catch (e) {
         console.error("Invalid JSON response:", text);
         throw new Error(`伺服器回傳了非預期的格式`);

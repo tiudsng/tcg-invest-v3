@@ -55,12 +55,7 @@ export const CreateListing = () => {
       const base64Data = compressedImage.split(",")[1] || compressedImage;
       const mimeType = compressedImage.split(";")[0].split(":")[1] || "image/jpeg";
 
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error("請在設定中設定 GEMINI_API_KEY");
-      }
-
-      const ai = new GoogleGenAI({ apiKey: apiKey.trim().replace(/^["']|["']$/g, '') });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
