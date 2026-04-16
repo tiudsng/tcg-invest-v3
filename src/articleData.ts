@@ -2,6 +2,7 @@ export const ARTICLES = [
   {
     id: "5",
     title: "【市場分析】Armored Mewtwo: PROMO（SM-P 365）近期升幅解析",
+    zone: 3,
     excerpt: "SM-P 365 武裝超夢作為 Pokemon TCG 稀有 Promo 卡，過去一個月價格持續上漲，引起收藏家與投資者廣泛關注。",
     content: `## 近期價格漲幅分析
 
@@ -29,7 +30,7 @@ export const ARTICLES = [
     category: "市場動態",
     readTime: "閱讀時間 · 3 min",
     date: "2026年4月15日",
-    imageUrl: "https://litter.catbox.moe/s8hjfp.png",
+    imageUrl: "https://pokeca-chart.com/wp-content/uploads/2023/06/SM-P_365_Armored_Mewtwo_ex.jpg",
     featured: false,
     isList: true
   },
