@@ -30,7 +30,7 @@ export const ARTICLES = [
     category: "市場動態",
     readTime: "閱讀時間 · 3 min",
     date: "2026年4月15日",
-    imageUrl: "https://pokeca-chart.com/wp-content/uploads/2023/06/SM-P_365_Armored_Mewtwo_ex.jpg",
+    imageUrl: "https://litter.catbox.moe/s8hjfp.png",
     featured: false,
     isList: true
   },
