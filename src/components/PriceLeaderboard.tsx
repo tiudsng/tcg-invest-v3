@@ -48,7 +48,7 @@ const MOCK_PRODUCTS: Product[] = [
     name_jp: 'リザードンex',
     card_number: '201/165',
     set_name: 'SV2a 151',
-    image_url: 'https://images.pokemoncard.io/cards/sv2a/201.png',
+    image_url: 'https://storage.googleapis.com/gen-lang-client-0326385388.firebasestorage.app/card_images/snkrdunk_128117.webp',
     market_data: { snkrdunk_price: 12500, ebay_price: 12500, change_24h: '+2.4%', status: 'up' }
   },
   {
@@ -58,7 +58,7 @@ const MOCK_PRODUCTS: Product[] = [
     name_jp: 'ゴッホ ピカチュウ',
     card_number: '085/SVP',
     set_name: 'Promo',
-    image_url: 'https://images.pokemoncard.io/cards/svp/85.png',
+    image_url: 'https://storage.googleapis.com/gen-lang-client-0326385388.firebasestorage.app/card_images/snkrdunk_146897.webp',
     market_data: { snkrdunk_price: 8800, ebay_price: 8800, change_24h: '+5.1%', status: 'up' }
   },
   {
@@ -68,7 +68,7 @@ const MOCK_PRODUCTS: Product[] = [
     name_jp: 'ミュウex',
     card_number: '205/165',
     set_name: 'SV2a 151',
-    image_url: 'https://images.pokemoncard.io/cards/sv2a/205.png',
+    image_url: 'https://storage.googleapis.com/gen-lang-client-0326385388.firebasestorage.app/card_images/snkrdunk_128121.webp',
     market_data: { snkrdunk_price: 7200, ebay_price: 7200, change_24h: '+1.2%', status: 'up' }
   },
   {
@@ -78,7 +78,7 @@ const MOCK_PRODUCTS: Product[] = [
     name_jp: 'アーマードミュウツー',
     card_number: '365/SM-P',
     set_name: 'SM-P Promo',
-    image_url: 'https://images.pokemoncard.io/cards/smp/365.png',
+    image_url: 'https://storage.googleapis.com/gen-lang-client-0326385388.firebasestorage.app/card_images/snkrdunk_107574.webp',
     market_data: { snkrdunk_price: 4500, ebay_price: 4500, change_24h: '0.0%', status: 'stable' }
   },
   {
@@ -88,7 +88,7 @@ const MOCK_PRODUCTS: Product[] = [
     name_jp: 'ブラッキーVMAX',
     card_number: '095/069',
     set_name: 'S6a Eevee Heroes',
-    image_url: 'https://images.pokemoncard.io/cards/s6a/95.png',
+    image_url: 'https://storage.googleapis.com/gen-lang-client-0326385388.firebasestorage.app/card_images/snkrdunk_93021.webp',
     market_data: { snkrdunk_price: 18500, ebay_price: 18500, change_24h: '+0.5%', status: 'up' }
   },
   {
@@ -108,7 +108,7 @@ const MOCK_PRODUCTS: Product[] = [
     name_jp: 'ピカチュウex',
     card_number: '236/187',
     set_name: 'SV8a',
-    image_url: 'https://images.pokemoncard.io/cards/sv8a/236.png',
+    image_url: 'https://storage.googleapis.com/gen-lang-client-0326385388.firebasestorage.app/card_images/snkrdunk_469638.webp',
     market_data: { snkrdunk_price: 3200, ebay_price: 3200, change_24h: '-2.1%', status: 'down' }
   },
   {
@@ -118,7 +118,7 @@ const MOCK_PRODUCTS: Product[] = [
     name_jp: 'ゲンガー',
     card_number: '094/165',
     set_name: 'SV2a 151',
-    image_url: 'https://images.pokemoncard.io/cards/sv2a/94.png',
+    image_url: 'https://storage.googleapis.com/gen-lang-client-0326385388.firebasestorage.app/card_images/snkrdunk_128212.webp',
     market_data: { snkrdunk_price: 2800, ebay_price: 2800, change_24h: '+1.8%', status: 'up' }
   },
   {
