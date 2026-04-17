@@ -421,8 +421,21 @@ export const Home: React.FC = () => {
               placeholder="搜尋噴火龍、皮卡丘..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && searchQuery.trim()) {
+                  navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+                }
+              }}
               className="block w-full pl-14 pr-6 py-4.5 bg-gray-100/80 dark:bg-white/5 border-0 rounded-[1.5rem] text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-white/10 transition-all shadow-sm text-base"
             />
+            {searchQuery && (
+              <button 
+                onClick={() => navigate(`/search?q=${encodeURIComponent(searchQuery)}`)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
+              >
+                全站搜尋
+              </button>
+            )}
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}

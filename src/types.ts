@@ -28,4 +28,28 @@ export interface WantListing {
   englishName?: string;
 }
 
+export interface Product {
+  id?: string;
+  card_id: string;
+  rank: number;
+  name_zh: string;
+  name_jp: string;
+  card_number?: string;
+  set_name: string;
+  image_url: string;
+  market_data: {
+    snkrdunk_price: number;
+    ebay_price: number;
+    change_24h: string;
+    status: string;
+  };
+}
+
+export interface PokemonCard {
+  cardID: string;
+  cardThumbFile: string;
+  cardNameAltText: string;
+  cardNameViewText: string;
+}
+
 export interface PortfolioItem {}

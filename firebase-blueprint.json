@@ -103,9 +103,13 @@
       "schema": { "$ref": "#/entities/UserProfile" },
       "description": "User profiles"
     },
+    "/list_1/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Leaderboard List 1"
+    },
     "/products/{productId}": {
       "schema": { "$ref": "#/entities/Product" },
-      "description": "Products for leaderboard"
+      "description": "Legacy products collection"
     },
     "/listings/{listingId}": {
       "schema": { "$ref": "#/entities/Listing" },

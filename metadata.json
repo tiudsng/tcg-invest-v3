@@ -1,5 +1,5 @@
 {
-  "name": "Project Restore",
-  "description": "Restoring an old React + Vite project from uploaded files.",
+  "name": "OpenClaw 寶可夢市集",
+  "description": "專業寶可夢卡牌交易平台，AI 辨識價格與即時市場行情。",
   "requestFramePermissions": ["camera"]
 }

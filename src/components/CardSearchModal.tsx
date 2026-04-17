@@ -2,13 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, X, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
-
-interface PokemonCard {
-  cardID: string;
-  cardThumbFile: string;
-  cardNameAltText: string;
-  cardNameViewText: string;
-}
+import { PokemonCard } from '../types';
 
 interface CardSearchModalProps {
   isOpen: boolean;

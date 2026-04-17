@@ -15,6 +15,7 @@ import { ArticleDetail } from './ArticleDetail';
 import { Articles } from './Articles';
 import { AIScan } from './AIScan';
 import { Admin } from './Admin';
+import { Search } from './Search';
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
             <div className="flex-grow overflow-auto">
               <Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="/search" element={<Search />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/create" element={<CreateListing />} />

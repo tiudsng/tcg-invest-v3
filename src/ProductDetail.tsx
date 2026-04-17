@@ -88,23 +88,34 @@ export const ProductDetail = () => {
       }
 
       try {
-        const docRef = doc(db, 'products', id);
-        const docSnap = await getDoc(docRef);
+        let cardData: any = null;
+        let docSnap = await getDoc(doc(db, 'list_1', id));
         
         if (docSnap.exists()) {
-          const data = docSnap.data();
+          cardData = docSnap.data();
+        } else {
+          // Try legacy products collection
+          docSnap = await getDoc(doc(db, 'products', id));
+          if (docSnap.exists()) {
+            cardData = docSnap.data();
+          }
+        }
+        
+        if (cardData) {
           setProduct({
             id: docSnap.id,
-            ...data,
-            market_data: data.market_data || {
-              snkrdunk_price: data.snkrdunk_price || data.price || 0,
-              ebay_price: data.ebay_price || data.price || 0,
-              change_24h: data.change_24h || '0%',
-              status: data.status || 'stable'
+            ...cardData,
+            // Fallback for card_id if not present
+            card_id: cardData.card_id || docSnap.id,
+            market_data: cardData.market_data || {
+              snkrdunk_price: cardData.snkrdunk_price || cardData.price || 0,
+              ebay_price: cardData.ebay_price || cardData.price || 0,
+              change_24h: cardData.change_24h || '0%',
+              status: cardData.status || 'stable'
             }
           } as Product);
         } else {
-          setError('找不到此排行榜卡片');
+          setError('找不到此卡片資料');
         }
       } catch (err) {
         console.error("Error fetching product:", err);
@@ -167,12 +178,16 @@ export const ProductDetail = () => {
               <span className="text-[#d4af37] font-black text-base tracking-[0.2em]">RANK {product.rank}</span>
             </div>
             <img 
-              src={product.image_url || product.imageUrl || 'https://placehold.co/600x840/111111/d4af37?text=Card+Image'} 
+              src={product.image_url || product.imageUrl || `https://images.pokemontcg.io/sv2a/${product.rank + 200}_hires.png`} 
               alt={product.name_zh} 
               className="max-w-full max-h-full object-contain drop-shadow-[0_0_50px_rgba(212,175,55,0.2)]"
               referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://placehold.co/600x840/111111/d4af37?text=Image+Error';
+                const target = e.target as HTMLImageElement;
+                if (!target.src.includes('placehold.co')) {
+                  target.src = `https://picsum.photos/seed/${encodeURIComponent(product.card_id || product.name_zh)}/600/840`;
+                }
               }}
             />
           </div>
@@ -227,6 +242,28 @@ export const ProductDetail = () => {
                   <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-1 rounded-md mb-3 tracking-widest">eBay</span>
                   <span className="text-2xl font-black text-white tracking-tight">HK${(product.market_data?.ebay_price || 0).toLocaleString()}</span>
                 </div>
+              </div>
+
+              {/* Extended Details */}
+              {(product as any).description && (
+                <div className="p-6 bg-white/5 rounded-2xl border border-white/5">
+                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">卡片描述</h4>
+                  <p className="text-sm text-gray-300 leading-relaxed font-medium">{(product as any).description}</p>
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-4">
+                {(['rarity_zh', 'type', 'illustrator', 'weakness'] as const).map((key) => {
+                  const val = (product as any)[key];
+                  if (!val) return null;
+                  const labels: Record<string, string> = { rarity_zh: '稀有度', type: '類型', illustrator: '繪師', weakness: '弱點' };
+                  return (
+                    <div key={key} className="p-4 bg-white/5 rounded-xl border border-white/5">
+                      <span className="block text-[10px] font-black text-gray-500 uppercase mb-1">{labels[key]}</span>
+                      <span className="text-sm font-bold text-gray-200">{val}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

@@ -47,14 +47,13 @@ export const CreateWant = () => {
           const base64Data = compressedBase64.split(",")[1] || compressedBase64;
           const mimeType = compressedBase64.split(";")[0].split(":")[1] || "image/jpeg";
 
-          const apiKey = process.env.GEMINI_API_KEY;
-          if (!apiKey) {
-            throw new Error("請在設定 (Settings) 中設定 GEMINI_API_KEY");
-          }
-          const ai = new GoogleGenAI({ apiKey });
+        if (!process.env.GEMINI_API_KEY) {
+          throw new Error("請點擊左下角齒輪圖示 (Settings) 設定 GEMINI_API_KEY");
+        }
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY.trim() });
           
           const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: [
               'Identify this Pokemon card. Return ONLY a valid JSON object with a single key "name" containing the Pokemon\'s name or character\'s name in Traditional Chinese or Japanese (e.g., {"name": "噴火龍"}). If you cannot identify it, return {"name": "Unknown"}. Do not include markdown formatting.',
               {

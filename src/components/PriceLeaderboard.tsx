@@ -4,23 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-
-interface Product {
-  id?: string;
-  card_id: string;
-  rank: number;
-  name_zh: string;
-  name_jp: string;
-  card_number?: string;
-  set_name: string;
-  image_url: string;
-  market_data: {
-    snkrdunk_price: number;
-    ebay_price: number;
-    change_24h: string;
-    status: string;
-  };
-}
+import { Product } from '../types';
 
 const AnimatedPrice = ({ price, prefix = "HK$ ", className = "" }: { price: number, prefix?: string, className?: string }) => {
   const [isFlashing, setIsFlashing] = useState(false);
@@ -58,45 +42,104 @@ const renderChange = (change: string, append7D: boolean = false) => {
 
 const MOCK_PRODUCTS: Product[] = [
   {
-    id: 'mock1',
-    card_id: 'c1',
+    card_id: 'charizard_151_sar',
     rank: 1,
-    name_zh: 'LUGIA VSTAR (HOLO)',
-    name_jp: 'ルギアVSTAR',
-    card_number: '196',
-    set_name: 'SILVER TEMPEST',
-    image_url: 'https://placehold.co/600x840/111111/d4af37?text=Lugia+VSTAR',
-    market_data: { snkrdunk_price: 10828, ebay_price: 10828, change_24h: '+15.4%', status: 'up' }
+    name_zh: '噴火龍 ex (151 SAR)',
+    name_jp: 'リザードンex',
+    card_number: '201/165',
+    set_name: 'SV2a 151',
+    image_url: 'https://images.pokemoncard.io/cards/sv2a/201.png',
+    market_data: { snkrdunk_price: 12500, ebay_price: 12500, change_24h: '+2.4%', status: 'up' }
   },
   {
-    id: 'mock2',
-    card_id: 'c2',
+    card_id: 'van_gogh_pikachu',
     rank: 2,
-    name_zh: 'Giratina V SA',
-    name_jp: 'ギラティナV',
-    set_name: 'LOST ABYSS',
-    image_url: 'https://placehold.co/400x560/1c1c1e/aaaaaa?text=Giratina+V',
-    market_data: { snkrdunk_price: 7950, ebay_price: 7950, change_24h: '+3.7%', status: 'up' }
+    name_zh: '梵高皮卡丘 (Promo)',
+    name_jp: 'ゴッホ ピカチュウ',
+    card_number: '085/SVP',
+    set_name: 'Promo',
+    image_url: 'https://images.pokemoncard.io/cards/svp/85.png',
+    market_data: { snkrdunk_price: 8800, ebay_price: 8800, change_24h: '+5.1%', status: 'up' }
   },
   {
-    id: 'mock3',
-    card_id: 'c3',
+    card_id: 'mew_151_sar',
     rank: 3,
-    name_zh: 'Umbreon VMAX SA',
-    name_jp: 'ブラッキーVMAX',
-    set_name: 'EEVEE HEROES',
-    image_url: 'https://placehold.co/400x560/1c1c1e/aaaaaa?text=Umbreon+VMAX',
-    market_data: { snkrdunk_price: 4110, ebay_price: 4110, change_24h: '-1.2%', status: 'down' }
+    name_zh: '夢幻 ex (泡泡 SAR)',
+    name_jp: 'ミュウex',
+    card_number: '205/165',
+    set_name: 'SV2a 151',
+    image_url: 'https://images.pokemoncard.io/cards/sv2a/205.png',
+    market_data: { snkrdunk_price: 7200, ebay_price: 7200, change_24h: '+1.2%', status: 'up' }
   },
   {
-    id: 'mock4',
-    card_id: 'c4',
+    card_id: 'mewtwo_armor',
     rank: 4,
-    name_zh: 'Charizard VMAX',
-    name_jp: 'リザードンVMAX',
-    set_name: 'SHINING FATES',
-    image_url: 'https://placehold.co/400x560/1c1c1e/aaaaaa?text=Charizard',
-    market_data: { snkrdunk_price: 2150, ebay_price: 2150, change_24h: '+1.5%', status: 'up' }
+    name_zh: '武裝夢夢 (特典)',
+    name_jp: 'アーマードミュウツー',
+    card_number: '365/SM-P',
+    set_name: 'SM-P Promo',
+    image_url: 'https://images.pokemoncard.io/cards/smp/365.png',
+    market_data: { snkrdunk_price: 4500, ebay_price: 4500, change_24h: '0.0%', status: 'stable' }
+  },
+  {
+    card_id: 'umbreon_vmax_sa',
+    rank: 5,
+    name_zh: '月亮伊布 VMAX (SA)',
+    name_jp: 'ブラッキーVMAX',
+    card_number: '095/069',
+    set_name: 'S6a Eevee Heroes',
+    image_url: 'https://images.pokemoncard.io/cards/s6a/95.png',
+    market_data: { snkrdunk_price: 18500, ebay_price: 18500, change_24h: '+0.5%', status: 'up' }
+  },
+  {
+    card_id: 'lillie_determination_sv9',
+    rank: 6,
+    name_zh: '莉莉艾的決意 (Mega 2026)',
+    name_jp: 'リーリエの全力',
+    card_number: 'SV9 SAR',
+    set_name: 'SV9',
+    image_url: 'https://placehold.co/400x560/f8d7da/721c24?text=Lillie+SV9',
+    market_data: { snkrdunk_price: 5800, ebay_price: 5800, change_24h: '+12.4%', status: 'up' }
+  },
+  {
+    card_id: 'pikachu_ex_sv8a',
+    rank: 7,
+    name_zh: '皮卡丘 ex (超電突波 UR)',
+    name_jp: 'ピカチュウex',
+    card_number: '236/187',
+    set_name: 'SV8a',
+    image_url: 'https://images.pokemoncard.io/cards/sv8a/236.png',
+    market_data: { snkrdunk_price: 3200, ebay_price: 3200, change_24h: '-2.1%', status: 'down' }
+  },
+  {
+    card_id: 'gengar_masterball',
+    rank: 8,
+    name_zh: '耿鬼 (151 大師球閃)',
+    name_jp: 'ゲンガー',
+    card_number: '094/165',
+    set_name: 'SV2a 151',
+    image_url: 'https://images.pokemoncard.io/cards/sv2a/94.png',
+    market_data: { snkrdunk_price: 2800, ebay_price: 2800, change_24h: '+1.8%', status: 'up' }
+  },
+  {
+    card_id: 'ion_sar',
+    rank: 9,
+    name_zh: '奇樹 (SAR)',
+    name_jp: 'ナンジャモ',
+    card_number: '357/190',
+    set_name: 'SV4a',
+    image_url: 'https://images.pokemoncard.io/cards/sv4a/357.png',
+    market_data: { snkrdunk_price: 1900, ebay_price: 1900, change_24h: '-0.5%', status: 'down' }
+  },
+  {
+    card_id: 'charizard_y_sv9',
+    rank: 10,
+    name_zh: 'Mega 噴火龍 Y ex (SAR)',
+    name_jp: 'メガリザードンY',
+    card_number: 'SV9',
+    set_name: 'SV9',
+    image_url: 'https://placehold.co/400x560/1c1c1e/d4af37?text=Charizard+Y+SV9',
+    market_data: { snkrdunk_price: 9500, ebay_price: 9500, change_24h: '+15.0%', status: 'up' }
   }
 ];
 
@@ -108,16 +151,14 @@ export const PriceLeaderboard = () => {
 
   useEffect(() => {
     const q = query(
-      collection(db, 'products'),
+      collection(db, 'list_1'),
       orderBy('rank', 'asc'),
       limit(10)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      console.log("Firestore snapshot received, docs count:", snapshot.docs.length);
       const productsData = snapshot.docs.map(doc => {
         const data = doc.data();
-        console.log("Doc data:", doc.id, data);
         return {
           id: doc.id,
           ...data,
@@ -174,12 +215,16 @@ export const PriceLeaderboard = () => {
             <div className="relative w-full aspect-[4/3] sm:aspect-[16/9] lg:aspect-[3/4] bg-gray-100 dark:bg-gray-900">
               <div className="absolute top-3 left-3 z-10 text-[#d4af37] text-2xl sm:text-3xl font-black drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] tracking-tighter">NO.1</div>
                 <img 
-                  src={topCards[0].image_url || (topCards[0] as any).imageUrl || 'https://placehold.co/600x450/1c1c1e/888888?text=Card+Image'} 
+                  src={topCards[0].image_url || (topCards[0] as any).imageUrl || 'https://images.pokemontcg.io/sv2a/201_hires.png'} 
                   alt={topCards[0].name_zh} 
                   className="w-full h-full object-cover lg:object-contain lg:p-4"
                   referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://placehold.co/600x450/1c1c1e/888888?text=Image+Error';
+                    const target = e.target as HTMLImageElement;
+                    if (!target.src.includes('placehold.co')) {
+                      target.src = `https://picsum.photos/seed/${encodeURIComponent(topCards[0].card_id || topCards[0].name_zh)}/600/840`;
+                    }
                   }}
                 />
               <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-[#111] to-transparent"></div>
@@ -229,12 +274,16 @@ export const PriceLeaderboard = () => {
             </div>
             <div className="w-full aspect-[3/4] flex items-center justify-center mb-6">
               <img 
-                src={card.image_url || (card as any).imageUrl || 'https://placehold.co/400x560/1c1c1e/888888?text=Card+Image'} 
+                src={card.image_url || (card as any).imageUrl || `https://images.pokemontcg.io/sv2a/${card.rank + 200}_hires.png`} 
                 alt={card.name_zh} 
                 className="max-w-full max-h-full object-contain drop-shadow-[0_0_20px_rgba(0,0,0,0.1)] dark:drop-shadow-[0_0_20px_rgba(255,255,255,0.1)] group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://placehold.co/400x560/1c1c1e/888888?text=Image+Error';
+                  const target = e.target as HTMLImageElement;
+                  if (!target.src.includes('placehold.co')) {
+                    target.src = `https://picsum.photos/seed/${encodeURIComponent(card.id || card.name_zh)}/400/560`;
+                  }
                 }}
               />
             </div>
@@ -286,12 +335,16 @@ export const PriceLeaderboard = () => {
                         </div>
                         <div className="w-10 aspect-[3/4] flex items-center justify-center bg-white dark:bg-black/40 rounded border border-gray-200 dark:border-white/5 p-0.5">
                           <img 
-                            src={card.image_url || (card as any).imageUrl || 'https://placehold.co/400x560/1c1c1e/888888?text=Card+Image'} 
+                            src={card.image_url || (card as any).imageUrl || `https://images.pokemontcg.io/sv2a/${card.rank + 200}_hires.png`} 
                             alt={card.name_zh} 
                             className="max-w-full max-h-full object-contain"
                             referrerPolicy="no-referrer"
+                            crossOrigin="anonymous"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://placehold.co/400x560/1c1c1e/888888?text=Error';
+                              const target = e.target as HTMLImageElement;
+                              if (!target.src.includes('placehold.co')) {
+                                target.src = `https://picsum.photos/seed/${encodeURIComponent(card.id || card.name_zh)}/100/140`;
+                              }
                             }}
                           />
                         </div>
