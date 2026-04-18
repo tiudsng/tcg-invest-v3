@@ -47,3 +47,16 @@ export async function compressBase64(base64Str: string): Promise<string> {
     return base64Str; // Fallback
   }
 }
+
+/**
+ * Returns the high-resolution version of an image URL.
+ * Specifically converts Pokellector .thumb.png to .png.
+ */
+export function getHighResImage(url?: string): string {
+  if (!url) return '';
+  // Check if it's a pokellector URL containing .thumb.png
+  if (url.includes('pokellector.com') && url.includes('.thumb.png')) {
+    return url.replace('.thumb.png', '.png');
+  }
+  return url;
+}

@@ -105,7 +105,7 @@ export const CardSearchModal: React.FC<CardSearchModalProps> = ({ isOpen, onClos
                     <img
                       src={`https://www.pokemon-card.com${card.cardThumbFile}`}
                       alt={card.cardNameViewText}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                       referrerPolicy="no-referrer"
                     />
                   </div>

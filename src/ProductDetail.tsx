@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { ArrowLeft, TrendingUp, ExternalLink, LineChart, Activity, ShoppingBag, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { getHighResImage } from './lib/imageUtils';
 
 interface Product {
   id?: string;
@@ -58,16 +59,16 @@ const MOCK_PRODUCTS: Record<string, Product> = {
     image_url: 'https://www.pokemon-card.com/assets/images/card_images/large/SV4a/045133_P_MIXYUUEX.jpg',
     market_data: { snkrdunk_price: 15828, ebay_price: 15828, change_24h: '+15.4%', status: 'up' }
   },
-  'mew_ex_usgmen': {
-    id: 'mew_ex_usgmen',
-    card_id: 'mew_ex_usgmen',
-    rank: 1,
-    name_zh: '夢幻 ex (SAR)',
-    name_jp: 'ミュウex',
-    card_number: '347/190',
-    set_name: 'SV4a',
-    image_url: 'https://www.pokemon-card.com/assets/images/card_images/large/SV4a/045133_P_MIXYUUEX.jpg',
-    market_data: { snkrdunk_price: 15828, ebay_price: 15828, change_24h: '+15.4%', status: 'up' }
+  'override_pikachu_ex_ur': {
+    id: 'override_pikachu_ex_ur',
+    card_id: 'pikachu_ex_sv8a',
+    rank: 8,
+    name_zh: '皮卡丘 ex (超電突波 UR)',
+    name_jp: 'ピカチュウex',
+    card_number: '236/187',
+    set_name: 'SV8a',
+    image_url: 'https://den-cards.pokellector.com/406/Pikachu-ex.SV8A.236.55302.png',
+    market_data: { snkrdunk_price: 3200, ebay_price: 5100, change_24h: '+2.1%', status: 'up' }
   },
   'mock1': {
     id: 'mock1',
@@ -200,17 +201,43 @@ export const ProductDetail = () => {
   const changeColor = isPos ? 'text-[#30d158]' : isNeg ? 'text-[#ff453a]' : 'text-gray-400';
   const changeDisplay = product.market_data.change_24h?.replace('+', '↗').replace('-', '↘') || '-';
 
+  const getProductImage = () => {
+    const zh = product.name_zh || '';
+    if (zh.includes('戴灰') || zh.includes('氈帽') || product.card_id.includes('van_gogh')) {
+      return 'https://images.pokemontcg.io/svp/85_hires.png';
+    }
+    if (zh.includes('夢幻') && (product.set_name === 'SV2a' || product.card_number?.includes('205'))) {
+      return 'https://den-cards.pokellector.com/371/Mew-ex.SV2A.205.48354.png';
+    }
+    if (zh.includes('夢幻') && (product.set_name === 'SV4a' || product.card_number?.includes('347'))) {
+      return 'https://www.pokemon-card.com/assets/images/card_images/large/SV4a/045133_P_MIXYUUEX.jpg';
+    }
+    if (zh.includes('皮卡丘') && zh.includes('ex') && (product.set_name?.toUpperCase() === 'SV8A' || product.card_number?.includes('236'))) {
+      return getHighResImage('https://den-cards.pokellector.com/406/Pikachu-ex.SV8A.236.55302.png');
+    }
+    return getHighResImage(product.image_url || product.imageUrl || (product as any).imageURL) || `https://placehold.co/600x840/111/d4af37?text=${encodeURIComponent(product.name_zh)}`;
+  };
+
+  const getImageClass = (url?: string) => {
+    const baseClass = "w-full h-full object-contain transition-transform duration-500 md:drop-shadow-[0_0_50px_rgba(212,175,55,0.2)]";
+    if (!url) return baseClass;
+    if (url.includes('snkrdunk_')) {
+      return `${baseClass} scale-[1.75] md:scale-[1.85]`;
+    }
+    return baseClass;
+  };
+
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white pb-32">
-      <div className="max-w-6xl mx-auto pt-20 sm:pt-24 md:pt-32 md:px-12">
+    <div className="min-h-screen bg-[#000000] text-white pb-32">
+      <div className="max-w-6xl mx-auto pt-28 sm:pt-36 md:pt-44 md:px-12">
         <div className="bg-[#111] md:rounded-[3rem] shadow-2xl border border-white/5 overflow-hidden flex flex-col md:flex-row">
           
           {/* Image Section */}
-          <div className="w-full md:w-[55%] aspect-[3/4] md:aspect-auto md:min-h-[700px] bg-black relative flex items-center justify-center p-0 md:p-12">
+          <div className="w-full md:w-[55%] aspect-[3/4] md:aspect-auto md:min-h-[700px] bg-black relative flex items-center justify-center p-0 md:p-12 overflow-hidden">
             <img 
-              src={product.image_url || product.imageUrl || (product as any).imageURL} 
+              src={getProductImage()} 
               alt={product.name_zh} 
-              className="w-full h-full object-contain md:drop-shadow-[0_0_50px_rgba(212,175,55,0.2)]"
+              className={getImageClass(getProductImage())}
               referrerPolicy="no-referrer"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
@@ -222,9 +249,9 @@ export const ProductDetail = () => {
           </div>
 
           {/* Details Section */}
-          <div className="w-full md:w-[45%] p-8 sm:p-12 flex flex-col">
-            <div className="mb-10">
-              <div className="flex flex-wrap items-center gap-3 mb-4">
+          <div className="w-full md:w-[45%] p-5 sm:p-8 md:p-12 flex flex-col">
+            <div className="mb-8">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
                 <div className="px-3 py-1.5 bg-[#d4af37]/10 border border-[#d4af37]/30 rounded-lg flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-[#d4af37]" />
                   <span className="text-xs font-black text-[#d4af37] uppercase tracking-widest">RANK {product.rank}</span>
@@ -247,16 +274,16 @@ export const ProductDetail = () => {
             </div>
 
             {/* Price Section */}
-            <div className="p-8 bg-[#1c1c1e] rounded-[2rem] border border-white/5 mb-10 shadow-inner">
-              <div className="flex items-center gap-3 text-gray-500 mb-4">
-                <Activity className="w-5 h-5" />
-                <span className="text-sm font-black uppercase tracking-widest">當前市場均價</span>
+            <div className="p-5 sm:p-8 bg-[#1c1c1e] rounded-[1.5rem] sm:rounded-[2rem] border border-white/5 mb-8 sm:mb-10 shadow-inner">
+              <div className="flex items-center gap-2 sm:gap-3 text-gray-500 mb-3 sm:mb-4">
+                <Activity className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-xs sm:text-sm font-black uppercase tracking-widest">當前市場均價</span>
               </div>
-              <div className="flex items-baseline gap-4">
-                <span className="text-5xl sm:text-7xl font-black text-[#d4af37] tracking-tighter">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="text-[2.5rem] leading-none sm:text-7xl font-black text-[#d4af37] tracking-tighter">
                   HK${(product.market_data?.snkrdunk_price || 0).toLocaleString()}
                 </span>
-                <span className={`text-xl font-black ${changeColor}`}>
+                <span className={`text-lg sm:text-xl font-black ${changeColor} whitespace-nowrap`}>
                   {changeDisplay} (24h)
                 </span>
               </div>
@@ -266,14 +293,14 @@ export const ProductDetail = () => {
             <div className="space-y-6 flex-grow">
               <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.2em]">市場平台報價</h3>
               
-              <div className="grid grid-cols-2 gap-6">
-                <div className="p-6 bg-black/40 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center hover:bg-black/60 transition-colors">
-                  <span className="text-[10px] font-black bg-white text-black px-2 py-1 rounded-md mb-3 tracking-widest">SNKRDUNK</span>
-                  <span className="text-2xl font-black text-white tracking-tight">HK${(product.market_data?.snkrdunk_price || 0).toLocaleString()}</span>
+              <div className="grid grid-cols-2 gap-3 sm:gap-6">
+                <div className="p-4 sm:p-6 bg-black/40 rounded-[1rem] sm:rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center hover:bg-black/60 transition-colors">
+                  <span className="text-[9px] sm:text-[10px] font-black bg-white text-black px-2 py-0.5 sm:py-1 rounded-md mb-2 sm:mb-3 tracking-widest">SNKRDUNK</span>
+                  <span className="text-lg sm:text-2xl font-black text-white tracking-tight break-all">HK${(product.market_data?.snkrdunk_price || 0).toLocaleString()}</span>
                 </div>
-                <div className="p-6 bg-black/40 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center hover:bg-black/60 transition-colors">
-                  <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-1 rounded-md mb-3 tracking-widest">eBay</span>
-                  <span className="text-2xl font-black text-white tracking-tight">HK${(product.market_data?.ebay_price || 0).toLocaleString()}</span>
+                <div className="p-4 sm:p-6 bg-black/40 rounded-[1rem] sm:rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center hover:bg-black/60 transition-colors">
+                  <span className="text-[9px] sm:text-[10px] font-black bg-blue-600 text-white px-2 py-0.5 sm:py-1 rounded-md mb-2 sm:mb-3 tracking-widest">eBay</span>
+                  <span className="text-lg sm:text-2xl font-black text-white tracking-tight break-all">HK${(product.market_data?.ebay_price || 0).toLocaleString()}</span>
                 </div>
               </div>
 
@@ -301,10 +328,10 @@ export const ProductDetail = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="mt-12 pt-8 border-t border-white/10 flex gap-4">
+            <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-white/10 flex gap-4">
               <button 
                 onClick={() => navigate(`/?search=${encodeURIComponent(product.name_zh)}`)}
-                className="flex-1 bg-white hover:bg-gray-200 text-black py-5 rounded-[1.5rem] font-black text-xl flex items-center justify-center gap-3 transition-all active:scale-95 shadow-xl shadow-white/10"
+                className="flex-1 bg-white hover:bg-gray-200 text-black py-4 sm:py-5 rounded-[1.25rem] sm:rounded-[1.5rem] font-black text-lg sm:text-xl flex items-center justify-center gap-2 sm:gap-3 transition-all active:scale-95 shadow-lg shadow-white/5"
               >
                 <ShoppingBag className="w-6 h-6" />
                 在市集尋找此卡

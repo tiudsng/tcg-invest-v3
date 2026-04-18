@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { Camera, MessageCircle, LogOut, User as UserIcon, X, BookOpen, Search, Heart, Sparkles, BadgeDollarSign, Plus, Sun, Moon, ShieldCheck, Home, Scan, ChevronLeft } from 'lucide-react';
+import { Camera, MessageCircle, LogOut, User as UserIcon, X, BookOpen, Search, Heart, Sparkles, BadgeDollarSign, Plus, Sun, Moon, ShieldCheck, Home, Scan, ChevronLeft, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const Navbar: React.FC = () => {
@@ -69,7 +69,7 @@ export const Navbar: React.FC = () => {
     { path: '/promo-cards', label: 'Promo Cards', icon: Sparkles },
     { path: '/create', label: '賣卡區', icon: Camera, protected: true },
     { path: '/create-want', label: '徵卡區', icon: Sparkles, protected: true },
-    { path: '/articles', label: '資訊', icon: BookOpen },
+    { path: '/collection', label: '收藏', icon: Star },
     { path: '/portfolio', label: '投資組合', icon: BadgeDollarSign },
     { path: '/chats', label: '訊息', icon: MessageCircle, protected: true },
   ];
@@ -86,10 +86,10 @@ export const Navbar: React.FC = () => {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="fixed top-0 left-0 right-0 z-40 bg-white/70 dark:bg-black/70 backdrop-blur-2xl border-b border-black/5 dark:border-white/10 supports-[backdrop-filter]:bg-white/50 dark:supports-[backdrop-filter]:bg-black/50"
+        className="fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-black/70 backdrop-blur-3xl border-b border-black/5 dark:border-white/10 supports-[backdrop-filter]:bg-white/50 dark:supports-[backdrop-filter]:bg-black/50"
       >
         <div className="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-12">
-          <div className="flex justify-between items-center h-20 sm:h-24">
+          <div className="flex justify-between items-center h-16 sm:h-24">
             <div className="flex items-center gap-4">
               {isDetailView && (
                 <button

@@ -409,7 +409,7 @@ export const Home: React.FC = () => {
   const activeFilterCount = filters.conditions.length + filters.cardTypes.length + (filters.minPrice ? 1 : 0) + (filters.maxPrice ? 1 : 0);
 
   return (
-    <div className="pt-24 sm:pt-32 pb-12 px-4 sm:px-8 lg:px-12 max-w-[1600px] mx-auto min-h-screen">
+    <div className="pt-32 sm:pt-40 pb-12 px-4 sm:px-8 lg:px-12 max-w-[1600px] mx-auto min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 sm:mb-16 gap-6 sm:gap-8">
         <div className="flex w-full gap-3">
           <div className="relative flex-grow md:w-[500px]">

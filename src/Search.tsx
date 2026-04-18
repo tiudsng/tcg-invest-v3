@@ -5,6 +5,7 @@ import { Search as SearchIcon, ArrowRight, Loader2, Package, Tag, Clock } from '
 import { motion } from 'motion/react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Product, Listing } from './types';
+import { getHighResImage } from './lib/imageUtils';
 
 export const Search = () => {
   const [searchParams] = useSearchParams();
@@ -125,11 +126,11 @@ export const Search = () => {
                       animate={{ opacity: 1, y: 0 }}
                       className="bg-white dark:bg-[#111] rounded-[2rem] overflow-hidden border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-xl transition-all group"
                     >
-                      <Link to={`/product/${product.id}`} className="block relative aspect-[3/4]">
+                      <Link to={`/product/${product.card_id || product.id}`} className="block relative aspect-[3/4] p-3 overflow-hidden">
                         <img 
-                          src={product.image_url} 
+                          src={getHighResImage(product.image_url) || `https://placehold.co/600x840/111/d4af37?text=${encodeURIComponent(product.name_zh || '')}`} 
                           alt={product.name_zh}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                           referrerPolicy="no-referrer"
                         />
                         <div className="absolute top-3 right-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded-lg text-[10px] font-black text-white uppercase tracking-tighter">

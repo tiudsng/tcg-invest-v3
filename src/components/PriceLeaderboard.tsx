@@ -5,6 +5,7 @@ import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestor
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../types';
+import { getHighResImage } from '../lib/imageUtils';
 
 const AnimatedPrice = ({ price, prefix = "HK$ ", className = "" }: { price: number, prefix?: string, className?: string }) => {
   const [isFlashing, setIsFlashing] = useState(false);
@@ -217,6 +218,21 @@ export const PriceLeaderboard = () => {
         };
       }
 
+      // Override Rank 8 card (Pikachu ex UR) with high-res image
+      if (productsData.length > 7) {
+        productsData[7] = {
+          ...productsData[7],
+          id: 'override_pikachu_ex_ur',
+          card_id: 'pikachu_ex_sv8a',
+          name_zh: '皮卡丘 ex (超電突波 UR)',
+          name_jp: 'ピカチュウex',
+          set_name: 'SV8a',
+          card_number: '236/187',
+          image_url: 'https://den-cards.pokellector.com/406/Pikachu-ex.SV8A.236.55302.png',
+          market_data: { snkrdunk_price: productsData[7].market_data?.snkrdunk_price || 3200, change_24h: productsData[7].market_data?.change_24h || '+2.1%' }
+        };
+      }
+
       // Fallback to mock data if collection is empty
       if (productsData.length === 0) {
         setProducts(MOCK_PRODUCTS);
@@ -245,6 +261,15 @@ export const PriceLeaderboard = () => {
   const topCards = products.slice(0, 3);
   const remainingCards = products.slice(3);
 
+  const getImageClass = (url?: string) => {
+    const baseClass = "w-full h-full object-contain transition-transform duration-500";
+    if (!url) return baseClass;
+    if (url.includes('snkrdunk_')) {
+      return `${baseClass} scale-[1.75] hover:scale-[1.8]`;
+    }
+    return baseClass;
+  };
+
   return (
     <div className="mb-12 sm:mb-16 bg-[#0a0a0a] rounded-[2rem] p-4 sm:p-6 shadow-2xl overflow-hidden border border-white/5">
       <div className="space-y-4">
@@ -259,9 +284,9 @@ export const PriceLeaderboard = () => {
             <div className="relative w-full aspect-[63/88] bg-black">
               <div className="absolute top-4 left-4 sm:top-5 sm:left-5 z-20 text-[#d4af37] text-4xl sm:text-5xl font-black drop-shadow-[0_4px_4px_rgba(0,0,0,1)] tracking-tighter italic">NO.1</div>
                 <img 
-                  src={topCards[0].image_url || (topCards[0] as any).imageUrl || (topCards[0] as any).imageURL} 
+                  src={getHighResImage(topCards[0].image_url || (topCards[0] as any).imageUrl || (topCards[0] as any).imageURL)} 
                   alt={topCards[0].name_zh} 
-                  className="w-full h-full object-cover object-top"
+                  className={getImageClass(topCards[0].image_url || (topCards[0] as any).imageUrl || (topCards[0] as any).imageURL)}
                   referrerPolicy="no-referrer"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -317,9 +342,9 @@ export const PriceLeaderboard = () => {
               <div className="absolute top-3 left-3 z-20 text-gray-300 text-2xl font-black drop-shadow-[0_2px_4px_rgba(0,0,0,1)] tracking-tighter italic">NO.{idx + 2}</div>
               <div className="absolute top-3 right-3 z-20 bg-black/80 backdrop-blur border border-white/10 text-white text-[8px] font-black px-1.5 py-1 rounded leading-none text-center uppercase tracking-tighter">SNKR<br/>DUNK</div>
               <img 
-                src={card.image_url || (card as any).imageUrl || (card as any).imageURL} 
+                src={getHighResImage(card.image_url || (card as any).imageUrl || (card as any).imageURL)} 
                 alt={card.name_zh} 
-                className="w-full h-full object-cover object-top"
+                className={getImageClass(card.image_url || (card as any).imageUrl || (card as any).imageURL)}
                 referrerPolicy="no-referrer"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
@@ -377,11 +402,11 @@ export const PriceLeaderboard = () => {
                         <div className="w-8 text-gray-400 font-bold text-sm text-center tracking-tighter">
                           NO.{card.rank}
                         </div>
-                        <div className="w-10 aspect-[3/4] flex items-center justify-center bg-white dark:bg-black/40 rounded border border-gray-200 dark:border-white/5 p-0.5">
+                        <div className="w-10 aspect-[3/4] flex items-center justify-center bg-white dark:bg-black/40 rounded border border-gray-200 dark:border-white/5 p-0.5 overflow-hidden">
                           <img 
-                            src={card.image_url || (card as any).imageUrl || (card as any).imageURL} 
+                            src={getHighResImage(card.image_url || (card as any).imageUrl || (card as any).imageURL)} 
                             alt={card.name_zh} 
-                            className="max-w-full max-h-full object-contain"
+                            className={getImageClass(card.image_url || (card as any).imageUrl || (card as any).imageURL)}
                             referrerPolicy="no-referrer"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
