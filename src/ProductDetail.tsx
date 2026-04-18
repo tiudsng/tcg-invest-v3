@@ -25,6 +25,50 @@ interface Product {
 
 // Fallback mock data in case the ID is from the mock list
 const MOCK_PRODUCTS: Record<string, Product> = {
+  'override_van_gogh_pikachu': {
+    id: 'override_van_gogh_pikachu',
+    card_id: 'van_gogh_pikachu_en',
+    rank: 2,
+    name_zh: '戴灰氈帽的皮卡丘 (Promo)',
+    name_jp: 'Pikachu with Grey Felt Hat',
+    card_number: '085',
+    set_name: 'SVP Black Star Promos',
+    image_url: 'https://images.pokemontcg.io/svp/85_hires.png',
+    market_data: { snkrdunk_price: 8800, ebay_price: 8800, change_24h: '+5.1%', status: 'up' }
+  },
+  'override_mew_ex_sv2a': {
+    id: 'override_mew_ex_sv2a',
+    card_id: 'mew_ex_sv2a',
+    rank: 3,
+    name_zh: '夢幻 ex (泡泡 SAR)',
+    name_jp: 'ミュウex',
+    card_number: '205/165',
+    set_name: 'SV2a',
+    image_url: 'https://den-cards.pokellector.com/371/Mew-ex.SV2A.205.48354.png',
+    market_data: { snkrdunk_price: 7200, ebay_price: 7200, change_24h: '+1.2%', status: 'up' }
+  },
+  'override_mew_ex': {
+    id: 'override_mew_ex',
+    card_id: 'mew_ex_usgmen',
+    rank: 1,
+    name_zh: '夢幻 ex (SAR)',
+    name_jp: 'ミュウex',
+    card_number: '347/190',
+    set_name: 'SV4a',
+    image_url: 'https://www.pokemon-card.com/assets/images/card_images/large/SV4a/045133_P_MIXYUUEX.jpg',
+    market_data: { snkrdunk_price: 15828, ebay_price: 15828, change_24h: '+15.4%', status: 'up' }
+  },
+  'mew_ex_usgmen': {
+    id: 'mew_ex_usgmen',
+    card_id: 'mew_ex_usgmen',
+    rank: 1,
+    name_zh: '夢幻 ex (SAR)',
+    name_jp: 'ミュウex',
+    card_number: '347/190',
+    set_name: 'SV4a',
+    image_url: 'https://www.pokemon-card.com/assets/images/card_images/large/SV4a/045133_P_MIXYUUEX.jpg',
+    market_data: { snkrdunk_price: 15828, ebay_price: 15828, change_24h: '+15.4%', status: 'up' }
+  },
   'mock1': {
     id: 'mock1',
     card_id: 'c1',
@@ -158,35 +202,20 @@ export const ProductDetail = () => {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white pb-32">
-      {/* Mobile Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 p-4 flex justify-between items-center pointer-events-none">
-        <button 
-          onClick={() => navigate(-1)}
-          className="w-10 h-10 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center text-white pointer-events-auto hover:bg-black/60 border border-white/10 transition-colors"
-        >
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-      </div>
-
-      <div className="max-w-6xl mx-auto md:pt-32 md:px-12">
-        <div className="bg-[#111] md:rounded-[3rem] shadow-2xl border-x border-b md:border border-white/5 overflow-hidden flex flex-col md:flex-row">
+      <div className="max-w-6xl mx-auto pt-20 sm:pt-24 md:pt-32 md:px-12">
+        <div className="bg-[#111] md:rounded-[3rem] shadow-2xl border border-white/5 overflow-hidden flex flex-col md:flex-row">
           
           {/* Image Section */}
-          <div className="w-full md:w-[55%] aspect-[3/4] md:aspect-auto md:min-h-[700px] bg-black relative flex items-center justify-center p-12">
-            <div className="absolute top-8 left-8 z-10 bg-black/50 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3">
-              <TrendingUp className="w-5 h-5 text-[#d4af37]" />
-              <span className="text-[#d4af37] font-black text-base tracking-[0.2em]">RANK {product.rank}</span>
-            </div>
+          <div className="w-full md:w-[55%] aspect-[3/4] md:aspect-auto md:min-h-[700px] bg-black relative flex items-center justify-center p-0 md:p-12">
             <img 
-              src={product.image_url || product.imageUrl || `https://images.pokemontcg.io/sv2a/${product.rank + 200}_hires.png`} 
+              src={product.image_url || product.imageUrl || (product as any).imageURL} 
               alt={product.name_zh} 
-              className="max-w-full max-h-full object-contain drop-shadow-[0_0_50px_rgba(212,175,55,0.2)]"
+              className="w-full h-full object-contain md:drop-shadow-[0_0_50px_rgba(212,175,55,0.2)]"
               referrerPolicy="no-referrer"
-              crossOrigin="anonymous"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 if (!target.src.includes('placehold.co')) {
-                  target.src = `https://picsum.photos/seed/${encodeURIComponent(product.card_id || product.name_zh)}/600/840`;
+                  target.src = `https://placehold.co/600x840/111/d4af37?text=${encodeURIComponent(product.name_zh)}`;
                 }
               }}
             />
@@ -195,7 +224,11 @@ export const ProductDetail = () => {
           {/* Details Section */}
           <div className="w-full md:w-[45%] p-8 sm:p-12 flex flex-col">
             <div className="mb-10">
-              <div className="flex flex-wrap gap-3 mb-4">
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <div className="px-3 py-1.5 bg-[#d4af37]/10 border border-[#d4af37]/30 rounded-lg flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-[#d4af37]" />
+                  <span className="text-xs font-black text-[#d4af37] uppercase tracking-widest">RANK {product.rank}</span>
+                </div>
                 {product.set_name && (
                   <span className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-black text-gray-400 uppercase tracking-widest">
                     {product.set_name}

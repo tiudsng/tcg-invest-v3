@@ -58,7 +58,8 @@ export const CreateListing = () => {
       if (!process.env.GEMINI_API_KEY) {
         throw new Error("請點擊左下角齒輪圖示 (Settings) 設定 GEMINI_API_KEY");
       }
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY.trim() });
+      const cleanKey = process.env.GEMINI_API_KEY.replace(/['"]/g, '').trim();
+      const ai = new GoogleGenAI({ apiKey: cleanKey });
       
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",

@@ -76,6 +76,18 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.userId) || isAdmin();
     }
 
+    function isValidUserCollection(data) {
+      return data.keys().hasAll(['userId', 'card_id']) &&
+             data.userId == request.auth.uid;
+    }
+
+    match /user_collections/{docId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidUserCollection(request.resource.data);
+      allow update: if isOwner(resource.data.userId) && isValidUserCollection(request.resource.data) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isOwner(resource.data.userId);
+    }
+
     match /articles/{articleId} {
       allow read: if true;
       allow write: if isAdmin();

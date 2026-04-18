@@ -11,6 +11,7 @@ export const Navbar: React.FC = () => {
   const [showCreateMenu, setShowCreateMenu] = useState(false);
 
   const isDetailView = location.pathname.startsWith('/listing/') || 
+                      location.pathname.startsWith('/product/') ||
                       location.pathname.startsWith('/chat/') ||
                       location.pathname.startsWith('/article/') ||
                       location.pathname.startsWith('/create') ||

@@ -368,6 +368,16 @@ export const Profile = () => {
 
           {/* Action Cards */}
           <div className="flex flex-col gap-4">
+            <button onClick={() => navigate('/collection')} className="flex-1 flex items-center gap-4 p-6 rounded-[2rem] bg-white dark:bg-[#1c1c1e] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors border border-gray-100 dark:border-white/5 shadow-sm group">
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform">
+                <Star className="w-7 h-7" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-lg font-black text-gray-900 dark:text-white">我的收藏</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">管理與查看您的專屬卡牌收藏</p>
+              </div>
+            </button>
+
             <button onClick={() => navigate('/')} className="flex-1 flex items-center gap-4 p-6 rounded-[2rem] bg-white dark:bg-[#1c1c1e] hover:bg-gray-50 dark:hover:bg-[#222] transition-colors border border-gray-100 dark:border-white/5 shadow-sm group">
               <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
                 <Package className="w-7 h-7" />

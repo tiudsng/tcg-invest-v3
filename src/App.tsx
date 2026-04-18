@@ -16,6 +16,7 @@ import { Articles } from './Articles';
 import { AIScan } from './AIScan';
 import { Admin } from './Admin';
 import { Search } from './Search';
+import { MyCollection } from './MyCollection';
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
                 <Route path="/search" element={<Search />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/collection" element={<MyCollection />} />
                 <Route path="/create" element={<CreateListing />} />
                 <Route path="/create-want" element={<CreateWant />} />
                 <Route path="/listing/:id" element={<ListingDetail />} />

@@ -165,7 +165,6 @@ export const Admin = () => {
         const productsRef = collection(db, 'products');
         const q = query(
           productsRef, 
-          where('name_zh', '==', item.name_zh),
           where('card_number', '==', item.card_number)
         );
         const productSnap = await getDocs(q);
@@ -173,15 +172,20 @@ export const Admin = () => {
         let finalData: any = { ...item };
         
         if (!productSnap.empty) {
-          const productData = productSnap.docs[0].data();
-          // Merge data, prioritizing product data for market info and metadata
-          // BUT DO NOT overwrite the image_url to avoid dead images from products
+          // Find the best match if multiple products have same card number (e.g. by name)
+          let productData = productSnap.docs[0].data();
+          if (productSnap.docs.length > 1) {
+            const exactNameMatch = productSnap.docs.find(d => d.data().name_zh === item.name_zh);
+            if (exactNameMatch) productData = exactNameMatch.data();
+          }
+
+          // Merge data, prioritizing product data for market info, metadata AND image
           finalData = {
             ...productData, // Start with product data
             ...item,        // Overwrite with leaderboard specific fields (rank, card_id, names)
             id: item.card_id,
             market_data: productData.market_data || item.market_data,
-            image_url: item.image_url,
+            image_url: productData.imageUrl || productData.image_url || item.image_url, 
             rank: item.rank
           };
         } else {
