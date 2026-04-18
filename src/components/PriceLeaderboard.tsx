@@ -173,65 +173,6 @@ export const PriceLeaderboard = () => {
           }
         };
       }) as any[];
-      
-      // Override Rank 1 card as explicitly requested
-      if (productsData.length > 0) {
-        productsData[0] = {
-          ...productsData[0],
-          id: 'override_mew_ex',
-          card_id: 'mew_ex_usgmen',
-          name_zh: '夢幻 ex (SAR)',
-          set_name: 'SV4a',
-          card_number: '347/190',
-          image_url: 'https://www.pokemon-card.com/assets/images/card_images/large/SV4a/045133_P_MIXYUUEX.jpg',
-          market_data: { snkrdunk_price: 15828, change_24h: '+15.4%' }
-        };
-      }
-
-      // Override Rank 2 card (Van Gogh Pikachu) with high-res TCG API image
-      if (productsData.length > 1) {
-        productsData[1] = {
-          ...productsData[1],
-          id: 'override_van_gogh_pikachu',
-          card_id: 'van_gogh_pikachu_en',
-          name_zh: '戴灰氈帽的皮卡丘 (Promo)',
-          name_jp: 'Pikachu with Grey Felt Hat',
-          set_name: 'SVP Black Star Promos',
-          card_number: '085',
-          image_url: 'https://images.pokemontcg.io/svp/85_hires.png',
-          market_data: { snkrdunk_price: productsData[1].market_data?.snkrdunk_price || 8800, change_24h: productsData[1].market_data?.change_24h || '+5.1%' }
-        };
-      }
-
-      // Override Rank 3 card (Mew ex SAR Japanese) with high-res image
-      if (productsData.length > 2) {
-        productsData[2] = {
-          ...productsData[2],
-          id: 'override_mew_ex_sv2a',
-          card_id: 'mew_ex_sv2a',
-          name_zh: '夢幻 ex (泡泡 SAR)',
-          name_jp: 'ミュウex',
-          set_name: 'SV2a',
-          card_number: '205/165',
-          image_url: 'https://den-cards.pokellector.com/371/Mew-ex.SV2A.205.48354.png',
-          market_data: { snkrdunk_price: productsData[2].market_data?.snkrdunk_price || 7200, change_24h: productsData[2].market_data?.change_24h || '+1.2%' }
-        };
-      }
-
-      // Override Rank 8 card (Pikachu ex UR) with high-res image
-      if (productsData.length > 7) {
-        productsData[7] = {
-          ...productsData[7],
-          id: 'override_pikachu_ex_ur',
-          card_id: 'pikachu_ex_sv8a',
-          name_zh: '皮卡丘 ex (超電突波 UR)',
-          name_jp: 'ピカチュウex',
-          set_name: 'SV8a',
-          card_number: '236/187',
-          image_url: 'https://den-cards.pokellector.com/406/Pikachu-ex.SV8A.236.55302.png',
-          market_data: { snkrdunk_price: productsData[7].market_data?.snkrdunk_price || 3200, change_24h: productsData[7].market_data?.change_24h || '+2.1%' }
-        };
-      }
 
       // Fallback to mock data if collection is empty
       if (productsData.length === 0) {
