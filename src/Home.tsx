@@ -294,7 +294,21 @@ export const Home: React.FC = () => {
     try {
       const q = query(collection(db, 'articles'), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
-      const dbArticles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      let dbArticles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+
+      // Exclude specific unwanted articles
+      const unwantedTitles = [
+        "本週卡價升幅榜",
+        "本週卡價升幅磅",
+        "寶可夢 TCG 市場升溫中！2026 年上半年趨勢分析",
+        "🔥 寶可夢 TCG 市場升溫中！2026 年上半年趨勢分析",
+        "2026 香港熱抄日文寶可夢卡牌情報 (JPN Edition)",
+        "收藏家聖杯：為什麼初版噴火龍能賣出天價？",
+        "【市場分析】Armored Mewtwo: PROMO（SM-P 365）近期升幅解析",
+        "市場分析】Armored Mewtwo: PROMO（SM-P 365）近期升幅解析"
+      ];
+      
+      dbArticles = dbArticles.filter(article => !unwantedTitles.some(title => article.title === title || article.title?.includes(title)));
       
       // Merge static articles with DB articles, avoiding duplicates by ID
       const merged = [...dbArticles];
