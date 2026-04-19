@@ -37,9 +37,13 @@ export interface Product {
   card_number?: string;
   set_name: string;
   image_url: string;
+  psa10_hkd?: number;
+  updated_at?: string;
   market_data: {
     snkrdunk_price: number;
     ebay_price: number;
+    raw_price?: number;
+    psa10_price?: number;
     change_24h: string;
     status: string;
   };

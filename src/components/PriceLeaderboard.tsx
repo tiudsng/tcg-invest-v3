@@ -264,11 +264,37 @@ export const PriceLeaderboard = () => {
               
               <div className="flex items-baseline gap-3 mb-4">
                 <span className="text-[#d4af37] text-3xl sm:text-4xl font-bold tracking-tighter">
-                  <AnimatedPrice price={topCards[0].market_data?.snkrdunk_price || 0} />
+                  <AnimatedPrice price={topCards[0].psa10_hkd || topCards[0].market_data?.snkrdunk_price || 0} />
                 </span>
                 <span className="text-sm font-bold">
                   {renderChange(topCards[0].market_data?.change_24h, true)}
                 </span>
+              </div>
+
+              {/* 4-Price Grid: PSA10/RAW x SNKRDUNK/eBay */}
+              <div className="grid grid-cols-2 gap-1 text-[10px] mb-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">SNKRDUNK</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">eBay</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-gray-400">PSA 10</span>
+                  <span className="text-[#d4af37] font-bold text-xs">HK$ {(topCards[0].psa10_hkd || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-gray-400">PSA 10</span>
+                  <span className="text-gray-300 font-bold text-xs">HK$ {(topCards[0].market_data?.psa10_price || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-gray-400">RAW</span>
+                  <span className="text-gray-300 font-bold text-xs">HK$ {(topCards[0].market_data?.raw_price || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-gray-400">RAW</span>
+                  <span className="text-gray-300 font-bold text-xs">HK$ {(topCards[0].market_data?.ebay_price || 0).toLocaleString()}</span>
+                </div>
               </div>
 
               <div className="text-gray-500 text-[10px] font-medium border-t border-white/10 pt-3">
@@ -307,10 +333,27 @@ export const PriceLeaderboard = () => {
 
             {/* Info Section - Solid Black Background */}
             <div className="px-3 pb-4 pt-0 relative z-10 bg-black flex flex-col flex-grow">
-              <h4 className="text-white text-xs sm:text-sm font-bold truncate mb-2">{card.name_zh}</h4>
-              <div className="flex flex-col gap-0.5 mt-auto">
-                <span className="text-gray-300 text-sm font-bold tracking-tight">HK$ {card.market_data?.snkrdunk_price?.toLocaleString()}</span>
-                <span className="text-xs font-bold">{renderChange(card.market_data?.change_24h)}</span>
+              <h4 className="text-white text-xs sm:text-sm font-bold truncate mb-1">{card.name_zh}</h4>
+              {/* 4-Price Mini Grid */}
+              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-auto">
+                <div className="text-[9px] text-gray-500">SNKRDUNK</div>
+                <div className="text-[9px] text-gray-500">eBay</div>
+                <div>
+                  <span className="text-[9px] text-gray-500">PSA </span>
+                  <span className="text-[#d4af37] font-bold text-[10px]">HK${(card.psa10_hkd || 0).toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-gray-500">PSA </span>
+                  <span className="text-gray-300 font-bold text-[10px]">HK${(card.market_data?.psa10_price || 0).toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-gray-500">RAW </span>
+                  <span className="text-gray-300 font-bold text-[10px]">HK${(card.market_data?.raw_price || 0).toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-gray-500">RAW </span>
+                  <span className="text-gray-300 font-bold text-[10px]">HK${(card.market_data?.ebay_price || 0).toLocaleString()}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -367,9 +410,11 @@ export const PriceLeaderboard = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="text-gray-900 dark:text-white text-xs font-bold truncate">{card.name_zh}</h4>
-                          <div className="text-[10px] flex items-center gap-1.5 mt-0.5">
-                            <span className="text-gray-500 dark:text-gray-400">HK$ {card.market_data?.snkrdunk_price?.toLocaleString()}</span>
-                            {renderChange(card.market_data?.change_24h)}
+                          <div className="grid grid-cols-2 gap-x-2 mt-1">
+                            <div className="text-[9px] text-gray-500">SNK PSA10 <span className="text-[#d4af37] font-bold">HK${(card.psa10_hkd || 0).toLocaleString()}</span></div>
+                            <div className="text-[9px] text-gray-500">eBay PSA10 <span className="text-gray-300 font-bold">HK${(card.market_data?.psa10_price || 0).toLocaleString()}</span></div>
+                            <div className="text-[9px] text-gray-500">SNK RAW <span className="text-gray-300 font-bold">HK${(card.market_data?.raw_price || 0).toLocaleString()}</span></div>
+                            <div className="text-[9px] text-gray-500">eBay RAW <span className="text-gray-300 font-bold">HK${(card.market_data?.ebay_price || 0).toLocaleString()}</span></div>
                           </div>
                         </div>
                       </div>
