@@ -205,10 +205,8 @@ export const PriceLeaderboard = () => {
   const getImageClass = (url?: string) => {
     const baseClass = "w-full h-full object-contain transition-transform duration-500";
     if (!url) return baseClass;
-    if (url.includes('snkrdunk_')) {
-      return `${baseClass} scale-[1.75] hover:scale-[1.8]`;
-    }
-    return baseClass;
+    // Scale up all card images to fill the display area
+    return `${baseClass} scale-[1.6] hover:scale-[1.65]`;
   };
 
   return (
