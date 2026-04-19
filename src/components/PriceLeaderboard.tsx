@@ -148,6 +148,7 @@ export const PriceLeaderboard = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -178,7 +179,13 @@ export const PriceLeaderboard = () => {
       if (productsData.length === 0) {
         setProducts(MOCK_PRODUCTS);
       } else {
-        setProducts(productsData);
+        // Extract last updated timestamp from first document with updated_at
+      const firstWithTs = productsData.find((p: any) => p.updated_at);
+      if (firstWithTs) {
+        setLastUpdated(firstWithTs.updated_at);
+      }
+
+      setProducts(productsData);
       }
       setLoading(false);
     }, (error) => {
@@ -265,7 +272,8 @@ export const PriceLeaderboard = () => {
               </div>
 
               <div className="text-gray-500 text-[10px] font-medium border-t border-white/10 pt-3">
-                由 AI 和 OpenClaw 技術驅動 - 價格實時排行榜
+                由 AI 和 OpenClaw 技術驅動
+{lastUpdated ? <span> · 更新 {lastUpdated}</span> : ''}
               </div>
             </div>
           </div>
