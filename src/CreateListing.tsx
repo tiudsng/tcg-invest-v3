@@ -1,135 +1,62 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { Camera, Upload, X, ArrowRight, Image as ImageIcon, Loader2, Search, Scan } from 'lucide-react';
+import { Camera, Upload, X, ArrowRight, ArrowLeft, Image as ImageIcon, Loader2, Plus, CheckCircle2 } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebase';
 import { motion } from 'motion/react';
-import { CardSearchModal } from './components/CardSearchModal';
-import { GoogleGenAI, Type } from '@google/genai';
 import { toast } from 'sonner';
-import { compressImage, compressBase64 } from './lib/imageUtils';
+import { compressImage } from './lib/imageUtils';
 
 export const CreateListing = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
   const [title, setTitle] = useState('');
+  const [seriesCode, setSeriesCode] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
   const [price, setPrice] = useState('');
-  const [condition, setCondition] = useState('NM');
+  const [condition, setCondition] = useState('RAW 卡');
   const [description, setDescription] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState('');
-  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
-  const CONDITIONS = ['Mint (M)', 'Near Mint (NM)', 'Lightly Played (LP)', 'Moderately Played (MP)', 'Heavily Played (HP)', 'Damaged', 'PSA 10', 'PSA 9', 'BGS 10', 'BGS 9.5'];
+  const CONDITIONS = ['RAW 卡', 'PSA10', 'PSA9', 'PSA8', 'under PSA8'];
+  const AVAILABLE_TAGS = ['有卡傷', '有白點', '有白邊', 'PSA殼有花', 'PSA殼有裂痕', '美品', '大細邊', '置中卡'];
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setImageFile(file);
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      const remainingSlots = 6 - imageFiles.length;
+      
+      if (files.length > remainingSlots) {
+        toast.error(`最多只能上傳 6 張圖片，還剩下 ${remainingSlots} 個位子`);
+        return;
+      }
+
+      const newFiles = files.slice(0, remainingSlots);
+      
       try {
-        const compressedBase64 = await compressImage(file);
-        setImagePreview(compressedBase64);
+        const previews = await Promise.all(
+          newFiles.map(file => compressImage(file))
+        );
+        
+        setImageFiles(prev => [...prev, ...newFiles]);
+        setImagePreviews(prev => [...prev, ...previews]);
       } catch (error) {
-        console.error('Error handling image upload:', error);
+        console.error('Error handling images upload:', error);
         toast.error('圖片處理失敗');
       }
     }
   };
 
-  const handleAIAnalyze = async () => {
-    if (!imagePreview) {
-      toast.error('請先上傳圖片');
-      return;
-    }
-
-    setIsAnalyzing(true);
-    try {
-      const compressedImage = await compressBase64(imagePreview);
-      const base64Data = compressedImage.split(",")[1] || compressedImage;
-      const mimeType = compressedImage.split(";")[0].split(":")[1] || "image/jpeg";
-
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error("請點擊左下角齒輪圖示 (Settings) 設定 GEMINI_API_KEY");
-      }
-      const cleanKey = process.env.GEMINI_API_KEY.replace(/['"]/g, '').trim();
-      const ai = new GoogleGenAI({ apiKey: cleanKey });
-      
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          'Identify this Pokemon card. Return ONLY a valid JSON object with a single key "name" containing the Pokemon\'s name or character\'s name in Traditional Chinese or Japanese (e.g., {"name": "噴火龍"}). If you cannot identify it, return {"name": "Unknown"}. Do not include markdown formatting.',
-          {
-            inlineData: {
-              data: base64Data,
-              mimeType: mimeType
-            }
-          }
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING, description: "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify." }
-            },
-            required: ["name"]
-          }
-        }
-      });
-
-      const text = response.text;
-      if (!text) {
-        throw new Error("AI 未回傳任何內容");
-      }
-
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        console.error("Invalid JSON response:", text);
-        throw new Error(`伺服器回傳了非預期的格式`);
-      }
-
-      if (data && data.name && data.name !== "Unknown") {
-        setTitle(data.name);
-        toast.success(`AI 辨識成功：${data.name}`);
-      } else {
-        toast.error('無法辨識卡牌，請確保圖片清晰並重試');
-      }
-    } catch (err: any) {
-      console.error('AI Error:', err);
-      toast.error(`AI 辨識失敗: ${err.message || '未知錯誤'}`);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleCardSelect = async (card: any) => {
-    setTitle(card.cardNameViewText);
-    setSelectedCardId(card.cardID);
-    setIsSearchModalOpen(false);
-    
-    // If no image is selected yet, use the official card image as preview
-    if (!imageFile && !imagePreview) {
-      setImagePreview(`https://www.pokemon-card.com${card.cardThumbFile}`);
-      
-      // Try to fetch the image and convert to File object
-      try {
-        const response = await fetch(`https://www.pokemon-card.com${card.cardThumbFile}`);
-        const blob = await response.blob();
-        const file = new File([blob], `${card.cardID}.jpg`, { type: 'image/jpeg' });
-        setImageFile(file);
-      } catch (err) {
-        console.error('Error fetching official image:', err);
-      }
-    }
+  const removeImage = (index: number) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,8 +65,8 @@ export const CreateListing = () => {
       setError('請先登入');
       return;
     }
-    if (!title || !price || !imageFile) {
-      setError('請填寫所有必填欄位並上傳圖片');
+    if (!title || !price || imageFiles.length === 0) {
+      setError('請填寫所有必填欄位並至少上傳一張圖片');
       return;
     }
 
@@ -147,19 +74,26 @@ export const CreateListing = () => {
     setError('');
 
     try {
-      // 1. Upload Image
-      const imageRef = ref(storage, `listings/${user.uid}/${Date.now()}_${imageFile.name}`);
-      await uploadBytes(imageRef, imageFile);
-      const imageUrl = await getDownloadURL(imageRef);
+      // 1. Upload All Images
+      const uploadPromises = imageFiles.map(async (file) => {
+        const imageRef = ref(storage, `listings/${user.uid}/${Date.now()}_${file.name}`);
+        const uploadResult = await uploadBytes(imageRef, file);
+        return await getDownloadURL(uploadResult.ref);
+      });
+
+      const imageUrls = await Promise.all(uploadPromises);
 
       // 2. Save to Firestore
       await addDoc(collection(db, 'listings'), {
         title,
+        seriesCode,
+        cardNumber,
         price: Number(price),
         condition,
         description,
-        imageUrl,
-        officialCardId: selectedCardId,
+        tags: selectedTags,
+        imageUrl: imageUrls[0], // First image as main
+        imageUrls: imageUrls,    // All images
         sellerId: user.uid,
         sellerName: user.displayName || '匿名賣家',
         sellerPhoto: user.photoURL || '',
@@ -177,178 +111,180 @@ export const CreateListing = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 sm:py-12 pb-32">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-[#111] rounded-[2rem] shadow-xl border border-gray-100 dark:border-white/5 overflow-hidden p-6 sm:p-8"
-      >
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-12 h-12 bg-blue-100 dark:bg-blue-500/20 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400">
-            <Camera className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">上架賣卡</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">拍下您的收藏，快速發佈到市集</p>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-black pb-32">
+      {/* iOS Style Header */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-gray-100 dark:border-white/10 px-4 h-16 flex items-center justify-between">
+        <button 
+          onClick={() => navigate(-1)}
+          className="px-2 py-1 text-blue-600 dark:text-blue-400 font-medium active:opacity-50 transition-all flex items-center gap-1"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          取消
+        </button>
+        <span className="font-semibold text-gray-900 dark:text-white">上架賣卡</span>
+        <button 
+          form="create-listing-form"
+          type="submit"
+          disabled={loading}
+          className="px-2 py-1 text-blue-600 dark:text-blue-400 font-bold disabled:opacity-30 active:opacity-50 transition-all shrink-0"
+        >
+          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : '發佈'}
+        </button>
+      </div>
 
+      <div className="max-w-xl mx-auto pt-20 px-4">
         {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm">
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl text-red-600 dark:text-red-400 text-sm font-medium">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Official DB Search Button */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setIsSearchModalOpen(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl font-bold transition-colors border border-indigo-100 dark:border-indigo-500/20"
-            >
-              <Search className="w-5 h-5" />
-              從官方資料庫搜尋卡牌 (自動帶入圖片與名稱)
-            </button>
-          </div>
-
-          {/* Image Upload */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">卡牌圖片 <span className="text-red-500">*</span></label>
-            <div className="relative">
-              {imagePreview ? (
-                <div className="relative w-full aspect-[4/3] sm:aspect-video rounded-2xl overflow-hidden bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 group">
-                  <img src={imagePreview} alt="Preview" className="w-full h-full object-contain" />
-                  <button
-                    type="button"
-                    onClick={() => { setImageFile(null); setImagePreview(null); setSelectedCardId(null); }}
-                    className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-md transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAIAnalyze}
-                    disabled={isAnalyzing}
-                    className="absolute bottom-4 right-4 px-4 py-2 bg-blue-600/90 hover:bg-blue-600 text-white rounded-xl backdrop-blur-md transition-all flex items-center gap-2 font-bold shadow-lg disabled:opacity-50"
-                  >
-                    {isAnalyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Scan className="w-5 h-5" />}
-                    {isAnalyzing ? '辨識中...' : 'AI 辨識'}
-                  </button>
-                </div>
-              ) : (
-                <label className="flex flex-col items-center justify-center w-full aspect-[4/3] sm:aspect-video rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 bg-gray-50 dark:bg-[#1a1a1a] hover:bg-blue-50 dark:hover:bg-blue-500/5 cursor-pointer transition-colors">
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <Upload className="w-10 h-10 text-gray-400 mb-3" />
-                    <p className="mb-2 text-sm text-gray-500 dark:text-gray-400 font-bold">點擊上傳圖片</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">支援 PNG, JPG, WEBP</p>
+        <form id="create-listing-form" onSubmit={handleSubmit} className="space-y-8">
+          {/* Photos Group */}
+          <section>
+            <h3 className="px-4 text-[13px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">卡片照片</h3>
+            <div className="bg-white dark:bg-white/5 rounded-[2rem] p-6 shadow-sm ring-1 ring-black/5 dark:ring-white/5">
+              <div className="grid grid-cols-3 gap-3">
+                {imagePreviews.map((preview, index) => (
+                  <div key={index} className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-gray-50 dark:bg-black/20 group ring-1 ring-black/5">
+                    <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/40 hover:bg-red-500 text-white rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-90"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    {index === 0 && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-blue-600/90 text-white text-[9px] font-bold text-center py-1 uppercase tracking-tighter">
+                        封面圖
+                      </div>
+                    )}
                   </div>
-                  <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
-                </label>
-              )}
-            </div>
-          </div>
-
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">卡牌名稱 <span className="text-red-500">*</span></label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="flex-1 px-4 py-3 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white"
-                placeholder="例如：噴火龍 VMAX SSR"
-              />
-              <button
-                type="button"
-                onClick={handleAIAnalyze}
-                disabled={isAnalyzing || !imagePreview}
-                className="flex flex-col items-center justify-center w-16 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-blue-100 dark:border-blue-500/20"
-              >
-                {isAnalyzing ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <Scan className="w-5 h-5 mb-0.5" />
-                    <span className="text-[10px] font-bold leading-none">AI 辨識</span>
-                  </>
+                ))}
+                
+                {imageFiles.length < 6 && (
+                  <label className="flex flex-col items-center justify-center aspect-[3/4] rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/10 hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-blue-500/5 cursor-pointer transition-all active:scale-95">
+                    <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-white/5 flex items-center justify-center mb-2">
+                      <Plus className="w-6 h-6 text-gray-400" />
+                    </div>
+                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">新增</span>
+                    <input type="file" multiple className="hidden" accept="image/*" onChange={handleImageChange} />
+                  </label>
                 )}
-              </button>
+              </div>
+              <p className="mt-4 text-[11px] text-gray-400 text-center">最多可上傳 6 張照片</p>
             </div>
-          </div>
+          </section>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {/* Price */}
-            <div>
-              <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">售價 (HK$) <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+          {/* Details Group */}
+          <section>
+            <h3 className="px-4 text-[13px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">基本資訊</h3>
+            <div className="bg-white dark:bg-white/5 rounded-[2rem] overflow-hidden shadow-sm ring-1 ring-black/5 dark:ring-white/5 divide-y divide-gray-100 dark:divide-white/5">
+              <div className="flex items-center px-5 py-4">
+                <label className="w-24 text-[15px] font-medium text-gray-500 dark:text-gray-400">卡牌名稱</label>
                 <input
-                  type="number"
+                  type="text"
                   required
-                  min="0"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="w-full pl-8 pr-4 py-3 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white"
-                  placeholder="0"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="flex-1 text-[15px] bg-transparent outline-none text-gray-900 dark:text-white placeholder:text-gray-300"
+                  placeholder="例如：噴火龍 VMAX SSR"
                 />
               </div>
+              <div className="flex items-center px-5 py-4">
+                <label className="w-24 text-[15px] font-medium text-gray-500 dark:text-gray-400">系列代號</label>
+                <input
+                  type="text"
+                  value={seriesCode}
+                  onChange={(e) => setSeriesCode(e.target.value.toUpperCase())}
+                  className="flex-1 text-[15px] bg-transparent outline-none text-gray-900 dark:text-white placeholder:text-gray-300 font-mono uppercase"
+                  placeholder="例如：SV4A"
+                />
+              </div>
+              <div className="flex items-center px-5 py-4">
+                <label className="w-24 text-[15px] font-medium text-gray-500 dark:text-gray-400">卡號碼</label>
+                <div className="flex-1 flex items-center justify-between gap-2">
+                  <input
+                    type="text"
+                    value={cardNumber}
+                    onChange={(e) => setCardNumber(e.target.value)}
+                    className="w-full text-[15px] bg-transparent outline-none text-gray-900 dark:text-white placeholder:text-gray-300 font-mono"
+                    placeholder="201/165"
+                  />
+                  {seriesCode && cardNumber ? (
+                    <div className="flex items-center gap-1 bg-green-100 dark:bg-green-900/40 px-2 py-1 rounded-full text-green-700 dark:text-green-400 shrink-0 shadow-sm border border-green-200 dark:border-green-800">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-bold tracking-wide">可配對市價</span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex items-center px-5 py-4">
+                <label className="w-24 text-[15px] font-medium text-gray-500 dark:text-gray-400">售價</label>
+                <div className="flex-1 flex items-center gap-1">
+                  <span className="text-[15px] font-bold text-blue-600">HK$</span>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    className="flex-1 text-[15px] bg-transparent outline-none text-gray-900 dark:text-white placeholder:text-gray-300 font-bold"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center px-5 py-4">
+                <label className="w-24 text-[15px] font-medium text-gray-500 dark:text-gray-400">評級狀態</label>
+                <select
+                  value={condition}
+                  onChange={(e) => setCondition(e.target.value)}
+                  className="flex-1 text-[15px] bg-transparent outline-none text-blue-600 dark:text-blue-400 font-semibold appearance-none text-right cursor-pointer"
+                >
+                  {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
             </div>
+          </section>
 
-            {/* Condition */}
-            <div>
-              <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">卡況 <span className="text-red-500">*</span></label>
-              <select
-                value={condition}
-                onChange={(e) => setCondition(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white appearance-none"
-              >
-                {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+          {/* Tags & Description Group */}
+          <section>
+            <h3 className="px-4 text-[13px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">描述與標籤</h3>
+            <div className="bg-white dark:bg-white/5 rounded-[2rem] p-6 shadow-sm ring-1 ring-black/5 dark:ring-white/5 space-y-6">
+              <div className="flex flex-wrap gap-2">
+                {AVAILABLE_TAGS.map(tag => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setSelectedTags(prev => 
+                      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                    )}
+                    className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all ${
+                      selectedTags.includes(tag)
+                        ? 'bg-blue-600 text-white shadow-md active:scale-95'
+                        : 'bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 active:scale-95'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                rows={5}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full text-[15px] leading-relaxed bg-gray-50 dark:bg-white/5 p-4 rounded-2xl outline-none text-gray-900 dark:text-white placeholder:text-gray-400 resize-none ring-1 ring-black/5 dark:ring-white/10"
+                placeholder="描述卡片的細節、瑕疵或交易方式..."
+              />
             </div>
-          </div>
+          </section>
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">詳細描述</label>
-            <textarea
-              rows={4}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white resize-none"
-              placeholder="描述卡片的細節、瑕疵或交易方式..."
-            />
-          </div>
-
-          {/* Submit Button */}
-          <div className="pt-4">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center items-center gap-2 py-4 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/30"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  上傳中...
-                </>
-              ) : (
-                <>
-                  確認上架
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </button>
-          </div>
+          {/* Hidden Action Button for Form Support */}
+          <button type="submit" className="hidden" />
         </form>
-      </motion.div>
-      <CardSearchModal 
-        isOpen={isSearchModalOpen} 
-        onClose={() => setIsSearchModalOpen(false)} 
-        onSelect={handleCardSelect} 
-      />
+      </div>
     </div>
   );
 };

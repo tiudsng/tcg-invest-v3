@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, addDoc, deleteDoc, doc, onSnapshot, 
 import { db } from './firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
-import { getHighResImage } from './lib/imageUtils';
+import { getHighResImage, handleImageError, getImageClass } from './lib/imageUtils';
 
 const MOCK_PRODUCTS: Record<string, any> = {
   'override_van_gogh_pikachu': {
@@ -196,29 +196,7 @@ export const MyCollection = () => {
   };
 
   const getCardImage = (item: CollectedCard) => {
-    const zh = item.name_zh || '';
-    if (zh.includes('戴灰') || zh.includes('氈帽') || item.card_id.includes('van_gogh')) {
-      return 'https://images.pokemontcg.io/svp/85_hires.png';
-    }
-    if (zh.includes('夢幻') && (item.set_name === 'SV2a' || item.card_number?.includes('205'))) {
-      return 'https://den-cards.pokellector.com/371/Mew-ex.SV2A.205.48354.png';
-    }
-    if (zh.includes('夢幻') && (item.set_name === 'SV4a' || item.card_number?.includes('347'))) {
-      return 'https://www.pokemon-card.com/assets/images/card_images/large/SV4a/045133_P_MIXYUUEX.jpg';
-    }
-    if (zh.includes('皮卡丘') && zh.includes('ex') && (item.set_name?.toUpperCase() === 'SV8A' || item.card_number?.includes('236'))) {
-      return getHighResImage('https://den-cards.pokellector.com/406/Pikachu-ex.SV8A.236.55302.png');
-    }
-    return getHighResImage(item.image_url) || `https://picsum.photos/seed/${item.card_id}/400/560`;
-  };
-
-  const getImageClass = (url?: string) => {
-    const baseClass = "w-full h-full object-contain transition-transform duration-500";
-    if (!url) return baseClass;
-    if (url.includes('snkrdunk_')) {
-      return `${baseClass} scale-[1.75] group-hover:scale-[1.8]`;
-    }
-    return `${baseClass} group-hover:scale-105`;
+    return getHighResImage(item.image_url, item.name_zh || item.name_jp, `${item.set_name}|${item.card_number}`);
   };
 
   const handleBack = () => {
@@ -442,6 +420,7 @@ export const MyCollection = () => {
                         alt={item.name_zh}
                         className={`max-w-full max-h-full transition-transform duration-700 group-hover:scale-110 drop-shadow-2xl ${getImageClass(getCardImage(item))}`}
                         referrerPolicy="no-referrer"
+                        onError={(e) => handleImageError(e, item.image_url, item.name_zh)}
                       />
                     </div>
                     

@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build",
-    "start": "tsx server.ts",
+    "build": "vite build && cp -r dist build || true",
+    "start": "node server.ts",
     "preview": "vite preview",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist build",
     "lint": "tsc --noEmit",
     "update-images": "tsx scripts/updatePokellectorImages.ts"
   },

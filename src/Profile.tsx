@@ -38,10 +38,12 @@ export const Profile = () => {
   const [originalName, setOriginalName] = useState('');
 
   const AVATAR_PRESETS = [
-    "https://api.dicebear.com/7.x/lorelei/svg?seed=Milo&backgroundColor=b6e3f4",
-    "https://api.dicebear.com/7.x/lorelei/svg?seed=Lily&backgroundColor=c0aede",
-    "https://api.dicebear.com/7.x/lorelei/svg?seed=Coco&backgroundColor=ffdfbf",
-    "https://api.dicebear.com/7.x/lorelei/svg?seed=Buster&backgroundColor=d1d4f9"
+    "https://api.dicebear.com/7.x/adventurer/svg?seed=Hero&backgroundColor=fb923c",  // 🔥 熱血主角
+    "https://api.dicebear.com/7.x/adventurer/svg?seed=Shadow&backgroundColor=3b82f6", // ❄️ 冷酷對手
+    "https://api.dicebear.com/7.x/adventurer/svg?seed=Luna&backgroundColor=f472b6",   // 💖 萌系偶像
+    "https://api.dicebear.com/7.x/adventurer/svg?seed=Sage&backgroundColor=2dd4bf",   // 🧠 天才軍師
+    "https://api.dicebear.com/7.x/adventurer/svg?seed=Zeno&backgroundColor=8b5cf6",   // 🌑 神祕反派
+    "https://api.dicebear.com/7.x/adventurer/svg?seed=Ace&backgroundColor=facc15"     // ⚡ 閃電王牌
   ];
 
   useEffect(() => {
@@ -148,7 +150,7 @@ export const Profile = () => {
   const avatarSrc = displayAvatar || defaultAvatar;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pt-6 pb-32 sm:py-12">
+    <div className="max-w-4xl mx-auto px-4 pt-24 sm:pt-32 pb-32">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -193,7 +195,7 @@ export const Profile = () => {
               <div className="space-y-5 w-full max-w-sm mx-auto md:mx-0">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 text-left">選擇頭像</label>
-                  <div className="flex gap-3 mb-3 justify-center md:justify-start">
+                  <div className="flex flex-wrap gap-3 mb-3 justify-center md:justify-start">
                     {AVATAR_PRESETS.map((preset, idx) => (
                       <button
                         key={idx}

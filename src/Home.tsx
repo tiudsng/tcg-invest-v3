@@ -469,7 +469,7 @@ export const Home: React.FC = () => {
               onClick={() => toggleFilter('conditions', cond)}
               className="flex items-center gap-1 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
             >
-              {cond === 'Mint' ? '美品' : cond}
+              {cond}
               <X className="w-3 h-3" />
             </button>
           ))}
@@ -501,11 +501,11 @@ export const Home: React.FC = () => {
             <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">篩選條件</h3>
             <button onClick={clearFilters} className="text-xs sm:text-sm font-bold text-blue-600 dark:text-blue-400">清除全部</button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
             <div>
-              <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">卡片狀態</h4>
+              <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">評級狀態</h4>
               <div className="flex flex-wrap gap-2">
-                {['Mint', 'Near Mint', 'Excellent', 'Good', 'Lightly Played', 'Played', 'Poor'].map((cond) => (
+                {['RAW 卡', 'PSA10', 'PSA9', 'PSA8', 'under PSA8'].map((cond) => (
                   <button
                     key={cond}
                     onClick={() => toggleFilter('conditions', cond)}
@@ -515,25 +515,7 @@ export const Home: React.FC = () => {
                         : 'bg-white dark:bg-black/20 border-gray-100 dark:border-white/5 text-gray-500 dark:text-gray-400'
                     }`}
                   >
-                    {cond === 'Mint' ? '美品' : cond}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">卡片類型</h4>
-              <div className="flex flex-wrap gap-2">
-                {['RAW', 'PSA 10', 'PSA 9', 'PSA 8', 'BGS', 'CGC'].map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => toggleFilter('cardTypes', type)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all ${
-                      filters.cardTypes.includes(type)
-                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
-                        : 'bg-white dark:bg-black/20 border-gray-100 dark:border-white/5 text-gray-500 dark:text-gray-400'
-                    }`}
-                  >
-                    {type}
+                    {cond}
                   </button>
                 ))}
               </div>
@@ -691,10 +673,24 @@ export const Home: React.FC = () => {
                       <FavoriteButton listingId={listing.id} className="absolute top-2 left-2 sm:top-4 sm:left-4 z-20" />
                     </div>
                     <div className="p-4 sm:p-6 flex flex-col flex-grow">
-                      <h3 className="text-sm sm:text-xl font-bold text-gray-900 dark:text-white line-clamp-1 mb-1 sm:mb-2 group-hover:text-blue-600 transition-colors">{listing.title}</h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-sm sm:text-xl font-bold text-gray-900 dark:text-white line-clamp-1 group-hover:text-blue-600 transition-colors flex-1">{listing.title}</h3>
+                        {listing.cardNumber && (
+                          <span className="text-[10px] sm:text-xs font-bold text-gray-400 dark:text-gray-500 whitespace-nowrap">#{listing.cardNumber}</span>
+                        )}
+                      </div>
                       <p className="text-lg sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3 sm:mb-6 tracking-tight">
                         HK${(listing.price * 7.8).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </p>
+                      {listing.tags && listing.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-4">
+                          {listing.tags.slice(0, 2).map(tag => (
+                            <span key={tag} className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-bold">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <div className="mt-auto pt-4 sm:pt-6 border-t border-gray-100 dark:border-white/5">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 sm:gap-3 truncate">
@@ -761,12 +757,27 @@ export const Home: React.FC = () => {
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap gap-1.5 mb-2">
-                      <ConditionBadge condition={listing.condition || 'Mint'} cardType={listing.cardType} title={listing.title} className="!px-3 !py-1 !text-[10px] !h-auto shadow-sm" />
+                        <ConditionBadge condition={listing.condition || 'Mint'} cardType={listing.cardType} title={listing.title} className="!px-3 !py-1 !text-[10px] !h-auto shadow-sm" />
+                        {listing.cardNumber && (
+                          <span className="px-2 py-0.5 bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 rounded-md text-[10px] font-bold">#{listing.cardNumber}</span>
+                        )}
                     </div>
                     <h3 className="text-base sm:text-2xl font-semibold text-gray-900 dark:text-white line-clamp-2 mb-2 tracking-tight">{listing.title}</h3>
                     <p className="text-xl sm:text-3xl font-semibold text-blue-600 dark:text-blue-400 tracking-tight">
                       預算 HK${(listing.targetPrice * 7.8).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </p>
+                    {listing.tags && listing.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-3">
+                        {listing.tags.slice(0, 3).map(tag => (
+                          <span key={tag} className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-md text-[10px] font-bold">
+                            {tag}
+                          </span>
+                        ))}
+                        {listing.tags.length > 3 && (
+                          <span className="text-[10px] text-gray-400 font-bold">+{listing.tags.length - 3}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="mt-auto pt-4 sm:pt-6 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">

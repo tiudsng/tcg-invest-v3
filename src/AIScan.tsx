@@ -149,7 +149,27 @@ export const AIScan = () => {
       }
     } catch (err: any) {
       console.error('AI Error:', err);
-      toast.error(`AI 辨識失敗: ${err.message || '未知錯誤'}`);
+      let errorMsg = err.message || '未知錯誤';
+      
+      // Clean up the Google Gen AI raw JSON error
+      if (typeof errorMsg === 'string' && errorMsg.includes('API key not valid')) {
+        errorMsg = "API Key 無效！請點擊 AI Studio 設定齒輪輸入正確的 GEMINI_API_KEY";
+      } else if (typeof errorMsg === 'string' && errorMsg.includes('User location is not supported')) {
+        errorMsg = "所在地區不支援呼叫此 API，或請確認您的 API Key 權限";
+      } else if (typeof errorMsg === 'string' && errorMsg.includes('{')) {
+         try {
+             const parsed = JSON.parse(errorMsg.substring(errorMsg.indexOf('{')));
+             if (parsed.error && parsed.error.message) {
+                 errorMsg = parsed.error.message;
+             }
+         } catch(e) {}
+         // Handle nested stringified API error
+         if (errorMsg.includes('API key not valid')) {
+            errorMsg = "API Key 無效！請點擊 AI Studio 設定齒輪輸入正確的 GEMINI_API_KEY";
+         }
+      }
+
+      toast.error(`AI 辨識失敗: ${errorMsg}`);
       setCapturedImage(null);
     } finally {
       setIsAnalyzing(false);

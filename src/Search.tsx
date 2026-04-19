@@ -5,7 +5,7 @@ import { Search as SearchIcon, ArrowRight, Loader2, Package, Tag, Clock } from '
 import { motion } from 'motion/react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Product, Listing } from './types';
-import { getHighResImage } from './lib/imageUtils';
+import { getHighResImage, handleImageError } from './lib/imageUtils';
 
 export const Search = () => {
   const [searchParams] = useSearchParams();
@@ -33,7 +33,8 @@ export const Search = () => {
         .map(doc => ({ id: doc.id, ...doc.data() } as Listing))
         .filter(l => 
           l.title.toLowerCase().includes(queryStr.toLowerCase()) ||
-          (l.englishName && l.englishName.toLowerCase().includes(queryStr.toLowerCase()))
+          (l.englishName && l.englishName.toLowerCase().includes(queryStr.toLowerCase())) ||
+          (l.cardNumber && l.cardNumber.toLowerCase().includes(queryStr.toLowerCase()))
         );
 
       const productsSnap = await getDocs(productQuery);
@@ -128,10 +129,11 @@ export const Search = () => {
                     >
                       <Link to={`/product/${product.card_id || product.id}`} className="block relative aspect-[3/4] p-3 overflow-hidden">
                         <img 
-                          src={getHighResImage(product.image_url) || `https://placehold.co/600x840/111/d4af37?text=${encodeURIComponent(product.name_zh || '')}`} 
+                          src={getHighResImage(product.image_url, product.name_zh, `${product.set_name}|${product.card_number}`) || `https://placehold.co/600x840/111/d4af37?text=${encodeURIComponent(product.name_zh || '')}`} 
                           alt={product.name_zh}
                           className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                           referrerPolicy="no-referrer"
+                          onError={(e) => handleImageError(e, product.image_url, product.name_zh)}
                         />
                         <div className="absolute top-3 right-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded-lg text-[10px] font-black text-white uppercase tracking-tighter">
                           {product.card_number || 'N/A'}
@@ -186,7 +188,12 @@ export const Search = () => {
                       </div>
                       <div className="flex flex-col justify-between py-2 flex-grow">
                         <div>
-                          <h3 className="text-lg font-black text-gray-900 dark:text-white line-clamp-1 mb-2">{listing.title}</h3>
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-lg font-black text-gray-900 dark:text-white line-clamp-1">{listing.title}</h3>
+                            {listing.cardNumber && (
+                              <span className="text-[10px] font-black text-gray-400 bg-gray-100 dark:bg-white/5 px-2 py-0.5 rounded-md">#{listing.cardNumber}</span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-4 text-xs font-bold text-gray-400">
                             <span className="px-2 py-0.5 bg-gray-100 dark:bg-white/5 rounded-md">{listing.condition}</span>
                             <span className="flex items-center gap-1">

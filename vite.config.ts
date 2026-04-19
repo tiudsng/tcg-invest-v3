@@ -12,6 +12,10 @@ export default defineConfig(() => {
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY),
     },
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

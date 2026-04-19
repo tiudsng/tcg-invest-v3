@@ -66,17 +66,25 @@ export const Admin = () => {
           card_number: '201/165',
           set_name: 'SV2a 151',
           image_url: 'https://images.pokemoncard.io/cards/sv2a/201.png',
-          market_data: { snkrdunk_price: 12500, ebay_price: 12500, change_24h: '+2.4%', status: 'up' }
+          market_data: { snkrdunk_price: 12800, ebay_price: 13500, change_24h: '+2.4%', status: 'up' }
         },
         {
           card_id: 'van_gogh_pikachu',
           rank: 2,
-          name_zh: '梵高皮卡丘 (Promo)',
+          name_zh: '戴灰氈帽的皮卡丘 (Promo)',
           name_jp: 'ゴッホ ピカチュウ',
           card_number: '085/SVP',
           set_name: 'Promo',
-          image_url: 'https://images.pokemoncard.io/cards/svp/85.png',
-          market_data: { snkrdunk_price: 8800, ebay_price: 8800, change_24h: '+5.1%', status: 'up' }
+          image_url: 'https://images.pokemontcg.io/svp/85_hires.png',
+          psa10_hkd: 28000,
+          market_data: { 
+            snkrdunk_price: 28000, 
+            psa10_price: 26743,
+            raw_price: 6160,
+            ebay_price: 28000, 
+            change_24h: '+5.1%', 
+            status: 'up' 
+          }
         },
         {
           card_id: 'mew_151_sar',
@@ -109,24 +117,24 @@ export const Admin = () => {
           market_data: { snkrdunk_price: 18500, ebay_price: 18500, change_24h: '+0.5%', status: 'up' }
         },
         {
-          card_id: 'lillie_determination_sv9',
+          card_id: 'mega_charizard_x_ex_sar',
           rank: 6,
-          name_zh: '莉莉艾的決意 (Mega 2026)',
-          name_jp: 'リーリエの全力',
-          card_number: 'SV9 SAR',
+          name_zh: 'Mega 噴火龍 X ex (SAR)',
+          name_jp: 'メガリザードンX ex',
+          card_number: '110/080',
           set_name: 'SV9',
-          image_url: 'https://placehold.co/400x560/f8d7da/721c24?text=Lillie+SV9',
-          market_data: { snkrdunk_price: 5800, ebay_price: 5800, change_24h: '+12.4%', status: 'up' }
+          image_url: 'https://limitlesstcg.s3.us-east-2.amazonaws.com/pokemon/jp/SV9/110.png',
+          market_data: { snkrdunk_price: 18500, ebay_price: 18500, change_24h: '+25.4%', status: 'up' }
         },
         {
-          card_id: 'pikachu_ex_sv8a',
+          card_id: 'lillie_sar_sv9',
           rank: 7,
-          name_zh: '皮卡丘 ex (超電突波 UR)',
-          name_jp: 'ピカチュウex',
-          card_number: '236/187',
-          set_name: 'SV8a',
-          image_url: 'https://images.pokemoncard.io/cards/sv8a/236.png',
-          market_data: { snkrdunk_price: 3200, ebay_price: 3200, change_24h: '-2.1%', status: 'down' }
+          name_zh: '莉莉艾 (SAR) - 團隊報恩',
+          name_jp: 'リーリエ SAR',
+          card_number: '111/080',
+          set_name: 'SV9',
+          image_url: 'https://limitlesstcg.s3.us-east-2.amazonaws.com/pokemon/jp/SV9/111.png',
+          market_data: { snkrdunk_price: 38500, ebay_price: 38500, change_24h: '+12.4%', status: 'up' }
         },
         {
           card_id: 'gengar_masterball',
@@ -180,11 +188,20 @@ export const Admin = () => {
           }
 
           // Merge data, prioritizing product data for market info, metadata AND image
+          const productMarket = (productData.market_data || {}) as any;
+          const itemMarket = (item.market_data || {}) as any;
+
           finalData = {
             ...productData, // Start with product data
             ...item,        // Overwrite with leaderboard specific fields (rank, card_id, names)
             id: item.card_id,
-            market_data: productData.market_data || item.market_data,
+            market_data: {
+              ...itemMarket,
+              ...productMarket,
+              // Force these to exist
+              snkrdunk_price: productMarket.snkrdunk_price || itemMarket.snkrdunk_price || productData.price || 0,
+              ebay_price: productMarket.ebay_price || itemMarket.ebay_price || productData.price || 0,
+            },
             image_url: productData.imageUrl || productData.image_url || item.image_url, 
             rank: item.rank
           };
@@ -299,7 +316,7 @@ export const Admin = () => {
   if (!isAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black pt-6 pb-32 px-4 sm:px-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-black pt-24 sm:pt-32 pb-32 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">

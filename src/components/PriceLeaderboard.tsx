@@ -5,7 +5,7 @@ import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestor
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../types';
-import { getHighResImage } from '../lib/imageUtils';
+import { getHighResImage, handleImageError, getImageClass } from '../lib/imageUtils';
 
 const AnimatedPrice = ({ price, prefix = "HK$ ", className = "" }: { price: number, prefix?: string, className?: string }) => {
   const [isFlashing, setIsFlashing] = useState(false);
@@ -43,24 +43,32 @@ const renderChange = (change: string, append7D: boolean = false) => {
 
 const MOCK_PRODUCTS: Product[] = [
   {
-    card_id: 'mew_ex_usgmen',
+    card_id: 'charizard_151_sar',
     rank: 1,
-    name_zh: '夢幻 ex (SAR)',
-    name_jp: 'ミュウex',
-    card_number: '347/190',
-    set_name: 'SV4a',
-    image_url: 'https://www.pokemon-card.com/assets/images/card_images/large/SV4a/045133_P_MIXYUUEX.jpg',
-    market_data: { snkrdunk_price: 15800, ebay_price: 15800, change_24h: '+8.4%', status: 'up' }
+    name_zh: '噴火龍 ex (151 SAR)',
+    name_jp: 'リザードンex',
+    card_number: '201/165',
+    set_name: 'SV2a 151',
+    image_url: 'https://images.pokemoncard.io/cards/sv2a/201.png',
+    market_data: { snkrdunk_price: 12800, ebay_price: 13500, change_24h: '+2.4%', status: 'up' }
   },
   {
     card_id: 'van_gogh_pikachu',
     rank: 2,
-    name_zh: '梵高皮卡丘 (Promo)',
+    name_zh: '戴灰氈帽的皮卡丘 (Promo)',
     name_jp: 'ゴッホ ピカチュウ',
     card_number: '085/SVP',
     set_name: 'Promo',
-    image_url: 'https://images.pokemontcg.io/swsh12pt5/85_hires.png',
-    market_data: { snkrdunk_price: 8800, ebay_price: 8800, change_24h: '+5.1%', status: 'up' }
+    image_url: 'https://images.pokemontcg.io/svp/85_hires.png',
+    psa10_hkd: 28000,
+    market_data: { 
+      snkrdunk_price: 28000, 
+      psa10_price: 26743,
+      raw_price: 6160,
+      ebay_price: 28000, 
+      change_24h: '+5.1%', 
+      status: 'up' 
+    }
   },
   {
     card_id: 'mew_151_sar',
@@ -69,7 +77,7 @@ const MOCK_PRODUCTS: Product[] = [
     name_jp: 'ミュウex',
     card_number: '205/165',
     set_name: 'SV2a 151',
-    image_url: 'https://images.pokemontcg.io/sv2a/205_hires.png',
+    image_url: 'https://den-cards.pokellector.com/371/Mew-ex.SV2A.205.48354.png',
     market_data: { snkrdunk_price: 7200, ebay_price: 7200, change_24h: '+1.2%', status: 'up' }
   },
   {
@@ -93,24 +101,24 @@ const MOCK_PRODUCTS: Product[] = [
     market_data: { snkrdunk_price: 18500, ebay_price: 18500, change_24h: '+0.5%', status: 'up' }
   },
   {
-    card_id: 'lillie_determination_sv9',
+    card_id: 'mega_charizard_x_ex_sar',
     rank: 6,
-    name_zh: '莉莉艾的決意 (Mega 2026)',
-    name_jp: 'リーリエの全力',
-    card_number: 'SV9 SAR',
+    name_zh: 'Mega 噴火龍 X ex (SAR)',
+    name_jp: 'メガリザードンX ex',
+    card_number: '110/080',
     set_name: 'SV9',
-    image_url: 'https://placehold.co/400x560/f8d7da/721c24?text=Lillie+SV9',
-    market_data: { snkrdunk_price: 5800, ebay_price: 5800, change_24h: '+12.4%', status: 'up' }
+    image_url: 'https://limitlesstcg.s3.us-east-2.amazonaws.com/pokemon/jp/SV9/110.png',
+    market_data: { snkrdunk_price: 18500, ebay_price: 18500, change_24h: '+25.4%', status: 'up' }
   },
   {
-    card_id: 'pikachu_ex_sv8a',
+    card_id: 'lillie_sar_sv9',
     rank: 7,
-    name_zh: '皮卡丘 ex (超電突波 UR)',
-    name_jp: 'ピカチュウex',
-    card_number: '236/187',
-    set_name: 'SV8a',
-    image_url: 'https://images.pokemoncard.io/cards/sv8a/236.png',
-    market_data: { snkrdunk_price: 3200, ebay_price: 3200, change_24h: '-2.1%', status: 'down' }
+    name_zh: '莉莉艾 (SAR) - 團隊報恩',
+    name_jp: 'リーリエ SAR',
+    card_number: '111/080',
+    set_name: 'SV9',
+    image_url: 'https://limitlesstcg.s3.us-east-2.amazonaws.com/pokemon/jp/SV9/111.png',
+    market_data: { snkrdunk_price: 38500, ebay_price: 38500, change_24h: '+12.4%', status: 'up' }
   },
   {
     card_id: 'gengar_masterball',
@@ -148,7 +156,6 @@ export const PriceLeaderboard = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -162,30 +169,40 @@ export const PriceLeaderboard = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       let productsData = snapshot.docs.map(doc => {
         const data = doc.data();
+        // Robust market data extraction
+        const marketData = (data.market_data || {}) as any;
+        let snkrdunkPrice = data.psa10_hkd || marketData.snkrdunk_price || marketData.snkdunk_price || data.snkrdunk_price || data.price || 0;
+        let ebayPrice = marketData.ebay_price || data.ebay_price || data.price || 0;
+        let psa10Price = marketData.psa10_price || 0;
+        let rawPrice = marketData.raw_price || 0;
+        const change24h = marketData.change_24h || data.change_24h || '0%';
+        const status = marketData.status || data.status || 'stable';
+
+        // Auto-fix JPY -> HKD for SNKRDUNK crawler data explicitly solving the 18900 outlier
+        if (doc.id === 'ion_sar' || data.name_zh?.includes('噴火龍 ex SAR')) {
+          if (ebayPrice > 10000) ebayPrice = Math.round(ebayPrice * 0.051);
+          if (snkrdunkPrice > 10000) snkrdunkPrice = Math.round(snkrdunkPrice * 0.051);
+        }
+
         return {
           id: doc.id,
           ...data,
-          // Ensure market_data exists even if flat in the list_1 document
-          market_data: data.market_data || {
-            snkrdunk_price: data.snkrdunk_price || data.price || 0,
-            ebay_price: data.ebay_price || data.price || 0,
-            change_24h: data.change_24h || '0%',
-            status: data.status || 'stable'
+          market_data: {
+            snkrdunk_price: snkrdunkPrice,
+            ebay_price: ebayPrice,
+            psa10_price: psa10Price,
+            raw_price: rawPrice,
+            change_24h: change24h,
+            status: status
           }
         };
       }) as any[];
-
+      
       // Fallback to mock data if collection is empty
       if (productsData.length === 0) {
         setProducts(MOCK_PRODUCTS);
       } else {
-        // Extract last updated timestamp from first document with updated_at
-      const firstWithTs = productsData.find((p: any) => p.updated_at);
-      if (firstWithTs) {
-        setLastUpdated(firstWithTs.updated_at);
-      }
-
-      setProducts(productsData);
+        setProducts(productsData);
       }
       setLoading(false);
     }, (error) => {
@@ -209,15 +226,6 @@ export const PriceLeaderboard = () => {
   const topCards = products.slice(0, 3);
   const remainingCards = products.slice(3);
 
-  const getImageClass = (url?: string) => {
-    const baseClass = "w-full h-full object-contain transition-transform duration-500";
-    if (!url) return baseClass;
-    if (url.includes('snkrdunk_')) {
-      return `${baseClass} scale-[1.75] hover:scale-[1.8]`;
-    }
-    return baseClass;
-  };
-
   return (
     <div className="mb-12 sm:mb-16 bg-[#0a0a0a] rounded-[2rem] p-4 sm:p-6 shadow-2xl overflow-hidden border border-white/5">
       <div className="space-y-4">
@@ -232,16 +240,11 @@ export const PriceLeaderboard = () => {
             <div className="relative w-full aspect-[63/88] bg-black">
               <div className="absolute top-4 left-4 sm:top-5 sm:left-5 z-20 text-[#d4af37] text-4xl sm:text-5xl font-black drop-shadow-[0_4px_4px_rgba(0,0,0,1)] tracking-tighter italic">NO.1</div>
                 <img 
-                  src={getHighResImage(topCards[0].image_url || (topCards[0] as any).imageUrl || (topCards[0] as any).imageURL)} 
+                  src={getHighResImage(topCards[0].image_url || (topCards[0] as any).imageUrl || (topCards[0] as any).imageURL, topCards[0].name_zh, `${topCards[0].set_name}|${topCards[0].card_number}`)} 
                   alt={topCards[0].name_zh} 
-                  className={getImageClass(topCards[0].image_url || (topCards[0] as any).imageUrl || (topCards[0] as any).imageURL)}
+                  className={getImageClass(getHighResImage(topCards[0].image_url || (topCards[0] as any).imageUrl || (topCards[0] as any).imageURL, topCards[0].name_zh, `${topCards[0].set_name}|${topCards[0].card_number}`))}
                   referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    if (!target.src.includes('placehold.co')) {
-                      target.src = `https://placehold.co/600x840/111/d4af37?text=${encodeURIComponent(topCards[0].name_zh)}`;
-                    }
-                  }}
+                  onError={(e) => handleImageError(e, topCards[0].image_url || (topCards[0] as any).imageUrl || (topCards[0] as any).imageURL, topCards[0].name_zh)}
                 />
               {/* Overlay Gradient to blend to black smoothly without hiding the card's bottom arts completely */}
               <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black to-transparent opacity-90"></div>
@@ -250,56 +253,23 @@ export const PriceLeaderboard = () => {
             {/* Info Section - Solid Black Background flush with gradient */}
             <div className="px-5 pb-5 pt-0 relative z-10 bg-black flex flex-col">
               <div className="flex justify-between items-center gap-3 mb-2">
-                <h3 className="text-white font-bold text-lg sm:text-xl uppercase leading-tight line-clamp-2">
+                <h3 className="text-white font-bold text-base sm:text-xl uppercase leading-tight line-clamp-2 italic tracking-tight">
                   {topCards[0].name_zh} {topCards[0].set_name ? `- ${topCards[0].set_name}` : ''} {topCards[0].card_number ? `#${topCards[0].card_number}` : ''}
                 </h3>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[12px] font-bold text-white italic opacity-80 uppercase">ebay</span>
-                  <div className="flex flex-col items-center justify-center opacity-80">
-                    <div className="w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[10px] text-white font-bold">C</div>
-                    <span className="text-[6px] text-white uppercase font-bold mt-0.5 tracking-wider">OpenClaw</span>
-                  </div>
-                </div>
               </div>
               
-              <div className="flex items-baseline gap-3 mb-4">
-                <span className="text-[#d4af37] text-3xl sm:text-4xl font-bold tracking-tighter">
-                  <AnimatedPrice price={topCards[0].psa10_hkd || topCards[0].market_data?.snkrdunk_price || 0} />
-                </span>
-                <span className="text-sm font-bold">
-                  {renderChange(topCards[0].market_data?.change_24h, true)}
-                </span>
-              </div>
-
-              {/* 4-Price Grid: PSA10/RAW x SNKRDUNK/eBay */}
-              <div className="grid grid-cols-2 gap-1 text-[10px] mb-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">SNKRDUNK</span>
+              <div className="flex flex-col gap-1 mb-4">
+                <div className="flex items-end gap-3 pt-2">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-[#d4af37] uppercase tracking-wider mb-0.5">PSA10 snkrdunk 售價</span>
+                    <span className="text-[#d4af37] text-2xl sm:text-4xl font-black tracking-tighter leading-none">
+                      <AnimatedPrice price={topCards[0].market_data?.ebay_price || topCards[0].market_data?.snkrdunk_price || 0} />
+                    </span>
+                  </div>
+                  <div className="pb-1">
+                    {renderChange(topCards[0].market_data?.change_24h, true)}
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">eBay</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-gray-400">PSA 10</span>
-                  <span className="text-[#d4af37] font-bold text-xs">HK$ {(topCards[0].psa10_hkd || 0).toLocaleString()}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-gray-400">PSA 10</span>
-                  <span className="text-gray-300 font-bold text-xs">HK$ {(topCards[0].market_data?.psa10_price || 0).toLocaleString()}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-gray-400">RAW</span>
-                  <span className="text-gray-300 font-bold text-xs">HK$ {(topCards[0].market_data?.raw_price || 0).toLocaleString()}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-gray-400">RAW</span>
-                  <span className="text-gray-300 font-bold text-xs">HK$ {(topCards[0].market_data?.ebay_price || 0).toLocaleString()}</span>
-                </div>
-              </div>
-
-              <div className="text-gray-500 text-[10px] font-medium border-t border-white/10 pt-3">
-                由 AI 和 OpenClaw 技術驅動
-{lastUpdated ? <span> · 更新 {lastUpdated}</span> : ''}
               </div>
             </div>
           </div>
@@ -315,45 +285,23 @@ export const PriceLeaderboard = () => {
             {/* Image Section - Matches exact card aspect ratio */}
             <div className="relative w-full aspect-[63/88] bg-black">
               <div className="absolute top-3 left-3 z-20 text-gray-300 text-2xl font-black drop-shadow-[0_2px_4px_rgba(0,0,0,1)] tracking-tighter italic">NO.{idx + 2}</div>
-              <div className="absolute top-3 right-3 z-20 bg-black/80 backdrop-blur border border-white/10 text-white text-[8px] font-black px-1.5 py-1 rounded leading-none text-center uppercase tracking-tighter">SNKR<br/>DUNK</div>
               <img 
-                src={getHighResImage(card.image_url || (card as any).imageUrl || (card as any).imageURL)} 
+                src={getHighResImage(card.image_url || (card as any).imageUrl || (card as any).imageURL, card.name_zh, `${card.set_name}|${card.card_number}`)} 
                 alt={card.name_zh} 
-                className={getImageClass(card.image_url || (card as any).imageUrl || (card as any).imageURL)}
+                className={getImageClass(getHighResImage(card.image_url || (card as any).imageUrl || (card as any).imageURL, card.name_zh, `${card.set_name}|${card.card_number}`))}
                 referrerPolicy="no-referrer"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  if (!target.src.includes('placehold.co')) {
-                    target.src = `https://placehold.co/400x560/111/aaaaaa?text=${encodeURIComponent(card.name_zh)}`;
-                  }
-                }}
+                onError={(e) => handleImageError(e, card.image_url || (card as any).imageUrl || (card as any).imageURL, card.name_zh)}
               />
               <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black to-transparent opacity-90"></div>
             </div>
 
             {/* Info Section - Solid Black Background */}
             <div className="px-3 pb-4 pt-0 relative z-10 bg-black flex flex-col flex-grow">
-              <h4 className="text-white text-xs sm:text-sm font-bold truncate mb-1">{card.name_zh}</h4>
-              {/* 4-Price Mini Grid */}
-              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-auto">
-                <div className="text-[9px] text-gray-500">SNKRDUNK</div>
-                <div className="text-[9px] text-gray-500">eBay</div>
-                <div>
-                  <span className="text-[9px] text-gray-500">PSA </span>
-                  <span className="text-[#d4af37] font-bold text-[10px]">HK${(card.psa10_hkd || 0).toLocaleString()}</span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-gray-500">PSA </span>
-                  <span className="text-gray-300 font-bold text-[10px]">HK${(card.market_data?.psa10_price || 0).toLocaleString()}</span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-gray-500">RAW </span>
-                  <span className="text-gray-300 font-bold text-[10px]">HK${(card.market_data?.raw_price || 0).toLocaleString()}</span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-gray-500">RAW </span>
-                  <span className="text-gray-300 font-bold text-[10px]">HK${(card.market_data?.ebay_price || 0).toLocaleString()}</span>
-                </div>
+              <h4 className="text-white text-xs sm:text-sm font-bold truncate mb-2">{card.name_zh}</h4>
+              <div className="flex flex-col gap-0.5 mt-auto">
+                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-tight">PSA10 snkrdunk 售價</span>
+                <span className="text-gray-300 text-sm font-bold tracking-tight">HK$ {card.market_data?.snkrdunk_price?.toLocaleString()}</span>
+                <span className="text-xs font-bold">{renderChange(card.market_data?.change_24h)}</span>
               </div>
             </div>
           </div>
@@ -410,11 +358,10 @@ export const PriceLeaderboard = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="text-gray-900 dark:text-white text-xs font-bold truncate">{card.name_zh}</h4>
-                          <div className="grid grid-cols-2 gap-x-2 mt-1">
-                            <div className="text-[9px] text-gray-500">SNK PSA10 <span className="text-[#d4af37] font-bold">HK${(card.psa10_hkd || 0).toLocaleString()}</span></div>
-                            <div className="text-[9px] text-gray-500">eBay PSA10 <span className="text-gray-300 font-bold">HK${(card.market_data?.psa10_price || 0).toLocaleString()}</span></div>
-                            <div className="text-[9px] text-gray-500">SNK RAW <span className="text-gray-300 font-bold">HK${(card.market_data?.raw_price || 0).toLocaleString()}</span></div>
-                            <div className="text-[9px] text-gray-500">eBay RAW <span className="text-gray-300 font-bold">HK${(card.market_data?.ebay_price || 0).toLocaleString()}</span></div>
+                          <div className="text-[10px] flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                            <span className="text-gray-500 dark:text-gray-400 font-bold">PSA10 snkrdunk 售價</span>
+                            <span className="text-gray-500 dark:text-gray-400 font-medium">HK$ {card.market_data?.snkrdunk_price?.toLocaleString()}</span>
+                            {renderChange(card.market_data?.change_24h)}
                           </div>
                         </div>
                       </div>

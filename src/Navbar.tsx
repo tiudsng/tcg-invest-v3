@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { Camera, MessageCircle, LogOut, User as UserIcon, X, BookOpen, Search, Heart, Sparkles, BadgeDollarSign, Plus, Sun, Moon, ShieldCheck, Home, Scan, ChevronLeft, Star } from 'lucide-react';
+import { Camera, MessageCircle, LogOut, User as UserIcon, X, BookOpen, Search, Heart, Sparkles, BadgeDollarSign, Plus, Sun, Moon, ShieldCheck, Home, Scan, ChevronLeft, Star, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 
 export const Navbar: React.FC = () => {
   const { user, signInWithGoogle, logOut } = useAuth();
@@ -56,6 +57,13 @@ export const Navbar: React.FC = () => {
       e.preventDefault();
       navigate(`/auth?from=${encodeURIComponent(location.pathname)}`);
     }
+  };
+
+  const handleInstallApp = () => {
+    toast('請點選瀏覽器底部的分享圖示，然後選擇「加入主畫面」', {
+      icon: '📱',
+      description: '享受全螢幕、無邊框的最佳使用體驗！',
+    });
   };
 
   const isActive = (path: string) => {
@@ -142,6 +150,16 @@ export const Navbar: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-3 sm:gap-6">
+              {/* Add to Home Screen PWA Button */}
+              <button
+                onClick={handleInstallApp}
+                className="p-2 sm:p-2.5 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 rounded-2xl transition-all active:scale-95 flex items-center gap-2 group border border-blue-100 dark:border-blue-500/20 shadow-sm"
+                title="加入主畫面"
+              >
+                <Download className="w-5 h-5 sm:w-6 sm:h-6" />
+                <span className="hidden sm:inline text-sm font-semibold tracking-tight">安裝 APP</span>
+              </button>
+
               <Link
                 to="/ai-scan"
                 className="p-2.5 sm:p-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-2xl transition-all active:scale-95 flex items-center gap-2.5 group"
