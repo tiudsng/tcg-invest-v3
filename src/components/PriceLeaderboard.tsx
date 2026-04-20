@@ -6,6 +6,7 @@ import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { getHighResImage, handleImageError, getImageClass } from '../lib/imageUtils';
+import { cleanMarketData } from '../lib/priceUtils';
 
 const AnimatedPrice = ({ price, prefix = "HK$ ", className = "" }: { price: number, prefix?: string, className?: string }) => {
   const [isFlashing, setIsFlashing] = useState(false);
@@ -169,32 +170,12 @@ export const PriceLeaderboard = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       let productsData = snapshot.docs.map(doc => {
         const data = doc.data();
-        // Robust market data extraction
-        const marketData = (data.market_data || {}) as any;
-        let snkrdunkPrice = data.psa10_hkd || marketData.snkrdunk_price || marketData.snkdunk_price || data.snkrdunk_price || data.price || 0;
-        let ebayPrice = marketData.ebay_price || data.ebay_price || data.price || 0;
-        let psa10Price = marketData.psa10_price || 0;
-        let rawPrice = marketData.raw_price || 0;
-        const change24h = marketData.change_24h || data.change_24h || '0%';
-        const status = marketData.status || data.status || 'stable';
-
-        // Auto-fix JPY -> HKD for SNKRDUNK crawler data explicitly solving the 18900 outlier
-        if (doc.id === 'ion_sar' || data.name_zh?.includes('噴火龍 ex SAR')) {
-          if (ebayPrice > 10000) ebayPrice = Math.round(ebayPrice * 0.051);
-          if (snkrdunkPrice > 10000) snkrdunkPrice = Math.round(snkrdunkPrice * 0.051);
-        }
+        const marketData = cleanMarketData(doc.id, data);
 
         return {
           id: doc.id,
           ...data,
-          market_data: {
-            snkrdunk_price: snkrdunkPrice,
-            ebay_price: ebayPrice,
-            psa10_price: psa10Price,
-            raw_price: rawPrice,
-            change_24h: change24h,
-            status: status
-          }
+          market_data: marketData
         };
       }) as any[];
       

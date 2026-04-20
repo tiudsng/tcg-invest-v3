@@ -10,6 +10,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { getHighResImage, handleImageError, getImageClass } from './lib/imageUtils';
 import { FavoriteButton } from './components/FavoriteButton';
+import { cleanMarketData } from './lib/priceUtils';
 
 const SnkrdunkLogo = ({ className = "" }: { className?: string }) => (
   <div className={`rounded-[4px] bg-gradient-to-br from-[#8C133E] via-[#35154E] to-[#070F35] flex flex-col items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] shrink-0 transition-all ${className}`}>
@@ -355,10 +356,10 @@ export const ProductDetail = () => {
                 <div>
                   <div className="flex items-center gap-1.5 mb-2">
                     <SnkrdunkLogo className="w-4 h-4 sm:w-[18px] sm:h-[18px] grayscale group-hover:grayscale-0 opacity-80 group-hover:opacity-100" />
-                    <span className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-widest leading-none">鑑定估算 (PSA 10)</span>
+                    <span className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-widest leading-none">PSA10 SNKRDUNK售價</span>
                   </div>
                   <span className="text-2xl sm:text-3xl font-black text-[#d4af37] tracking-tighter block mt-2 drop-shadow-sm">
-                    HK${(product.market_data?.psa10_price || product.market_data?.snkrdunk_price || 0).toLocaleString()}
+                    HK${(product.market_data?.snkrdunk_price || 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-gray-500">
