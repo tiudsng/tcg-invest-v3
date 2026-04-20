@@ -40,17 +40,8 @@ const MOCK_PRODUCTS: Record<string, Product> = {
       status: 'up' 
     }
   },
-  'charizard_151_sar': {
-    id: 'charizard_151_sar',
-    card_id: 'charizard_151_sar',
-    rank: 1,
-    name_zh: '噴火龍 ex (151 SAR)',
-    name_jp: 'リザードンex',
-    card_number: '201/165',
-    set_name: 'SV2a 151',
-    image_url: 'https://images.pokemoncard.io/cards/sv2a/201.png',
-    market_data: { snkrdunk_price: 12800, ebay_price: 13500, change_24h: '+2.4%', status: 'up' }
-  },
+  // REMOVED: charizard_151_sar override - was overriding Firebase data for a Mew ex SAR card (Firebase doc id misnamed)
+  // charizard_151_sar had Mew ex SAR (SV4a 347) in Firebase but Charizard in MOCK_PRODUCTS
   'override_mew_ex_sv2a': {
     id: 'override_mew_ex_sv2a',
     card_id: 'mew_ex_sv2a',
