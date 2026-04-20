@@ -382,41 +382,6 @@ export const ProductDetail = () => {
               </div>
             </div>
 
-            {/* Main Market Pulse */}
-            <div className="p-6 sm:p-8 bg-gradient-to-br from-[#1c1c1e] to-[#111] rounded-[2rem] border border-[#d4af37]/20 mb-8 shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-                <Activity className="w-32 h-32 text-[#d4af37]" />
-              </div>
-              
-              <div className="flex items-center justify-between mb-4 relative z-10">
-                <div className="flex items-center gap-2 text-[#d4af37]">
-                  <TrendingUp className="w-5 h-5" />
-                  <span className="text-xs font-black uppercase tracking-widest">當前市場成交價中心</span>
-                </div>
-                <span className={`text-base font-black ${changeColor} bg-black/40 px-3 py-1 rounded-full border border-current opacity-80`}>
-                  {changeDisplay}
-                </span>
-              </div>
-
-              <div className="relative z-10 mb-6 font-mono">
-                <span className="text-4xl sm:text-7xl font-black text-white tracking-tighter flex items-baseline gap-1">
-                  <span className="text-2xl sm:text-3xl text-gray-500">$</span>
-                  {(product.market_data?.ebay_price || product.market_data?.snkrdunk_price || 0).toLocaleString()}
-                </span>
-              </div>
-
-              {/* Simulated Micro Chart */}
-              <div className="relative h-16 w-full flex items-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
-                {[40, 65, 45, 80, 55, 90, 75, 100, 85, 110].map((h, i) => (
-                  <div 
-                    key={i} 
-                    className={`flex-1 rounded-t-sm transition-all duration-700 ${isPos ? 'bg-[#30d158]' : 'bg-[#ff453a]'}`}
-                    style={{ height: `${h}%` }}
-                  />
-                ))}
-              </div>
-            </div>
-
             {/* Investment Potential Summary */}
             <div className="mb-8 p-6 bg-white/5 rounded-2xl border border-white/5 backdrop-blur-md">
               <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">

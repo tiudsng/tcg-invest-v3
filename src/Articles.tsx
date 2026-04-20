@@ -17,8 +17,21 @@ export const Articles = () => {
       try {
         const q = query(collection(db, 'articles'), orderBy('createdAt', 'desc'));
         const snapshot = await getDocs(q);
-        const dbArticles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        let dbArticles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
         
+        // Exclude specific unwanted articles using keyword matching
+        const unwantedKeywords = [
+          "升幅",
+          "市場升溫",
+          "熱抄",
+          "噴火龍"
+        ];
+        
+        dbArticles = dbArticles.filter(article => {
+          const title = article.title || "";
+          return !unwantedKeywords.some(keyword => title.includes(keyword));
+        });
+
         // Merge static articles with DB articles
         const merged = [...dbArticles];
         ARTICLES.forEach(staticArt => {
