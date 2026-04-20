@@ -240,7 +240,7 @@ export const ProductDetail = () => {
   const liquidity = product.rank <= 10 ? '極高' : '高';
   
   // Platform Arbitrage
-  const priceA = product.market_data.snkrdunk_price || 0;
+  const priceA = product.market_data.psa10_price || product.market_data.snkrdunk_price || 0;
   const priceB = product.market_data.ebay_price || 0;
   const arbSpace = Math.abs(priceA - priceB);
   const arbPercent = priceA > 0 ? ((arbSpace / Math.min(priceA, priceB)) * 100).toFixed(1) : '0';
@@ -359,7 +359,7 @@ export const ProductDetail = () => {
                     <span className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-widest leading-none">PSA10 SNKRDUNK售價</span>
                   </div>
                   <span className="text-2xl sm:text-3xl font-black text-[#d4af37] tracking-tighter block mt-2 drop-shadow-sm">
-                    HK${(product.market_data?.snkrdunk_price || 0).toLocaleString()}
+                    HK${((product.market_data?.psa10_price || product.market_data?.snkrdunk_price) || 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-gray-500">
