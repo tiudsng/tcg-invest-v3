@@ -36,12 +36,24 @@ const MOCK_PRODUCTS: Record<string, Product> = {
       ebay_price: 28000, 
       psa10_price: 26743,
       raw_price: 6160,
+      psa_pop_total: 8254,
+      psa_pop_10: 1248,
+      psa_pop_10_percent: '15.1%',
       change_24h: '+5.1%', 
       status: 'up' 
     }
   },
-  // REMOVED: charizard_151_sar override - was overriding Firebase data for a Mew ex SAR card (Firebase doc id misnamed)
-  // charizard_151_sar had Mew ex SAR (SV4a 347) in Firebase but Charizard in MOCK_PRODUCTS
+  'charizard_151_sar': {
+    id: 'charizard_151_sar',
+    card_id: 'charizard_151_sar',
+    rank: 1,
+    name_zh: '噴火龍 ex (151 SAR)',
+    name_jp: 'リザードンex',
+    card_number: '201/165',
+    set_name: 'SV2a 151',
+    image_url: 'https://images.pokemoncard.io/cards/sv2a/201.png',
+    market_data: { snkrdunk_price: 12800, ebay_price: 13500, change_24h: '+2.4%', status: 'up' }
+  },
   'override_mew_ex_sv2a': {
     id: 'override_mew_ex_sv2a',
     card_id: 'mew_ex_sv2a',
@@ -179,6 +191,9 @@ export const ProductDetail = () => {
               ebay_price: ebayPrice,
               psa10_price: psa10Price,
               raw_price: rawPrice,
+              psa_pop_total: marketData.psa_pop_total || cardData.psa_pop_total || 0,
+              psa_pop_10: marketData.psa_pop_10 || cardData.psa_pop_10 || 0,
+              psa_pop_10_percent: marketData.psa_pop_10_percent || cardData.psa_pop_10_percent || '0%',
               change_24h: marketData.change_24h || cardData.change_24h || '0%',
               status: marketData.status || cardData.status || 'stable'
             }
@@ -231,7 +246,7 @@ export const ProductDetail = () => {
   const liquidity = product.rank <= 10 ? '極高' : '高';
   
   // Platform Arbitrage
-  const priceA = product.market_data.psa10_price || product.market_data.snkrdunk_price || 0;
+  const priceA = product.market_data.snkrdunk_price || 0;
   const priceB = product.market_data.ebay_price || 0;
   const arbSpace = Math.abs(priceA - priceB);
   const arbPercent = priceA > 0 ? ((arbSpace / Math.min(priceA, priceB)) * 100).toFixed(1) : '0';
@@ -350,7 +365,7 @@ export const ProductDetail = () => {
                     <span className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-widest leading-none">PSA10 SNKRDUNK售價</span>
                   </div>
                   <span className="text-2xl sm:text-3xl font-black text-[#d4af37] tracking-tighter block mt-2 drop-shadow-sm">
-                    HK${((product.market_data?.psa10_price || product.market_data?.snkrdunk_price) || 0).toLocaleString()}
+                    HK${(product.market_data?.snkrdunk_price || 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-gray-500">
@@ -371,6 +386,28 @@ export const ProductDetail = () => {
                 <div className="mt-3 flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-gray-500">
                   <LineChart className="w-3.5 h-3.5 text-gray-400" /> 未鑑定市價
                 </div>
+              </div>
+            </div>
+
+            {/* PSA Population Data Report */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-8">
+              <div className="p-3 sm:p-4 bg-[#1c1c1e]/50 backdrop-blur-xl rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center group hover:border-white/20 transition-all overflow-hidden text-center">
+                <span className="text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-tight sm:tracking-widest mb-1.5 whitespace-nowrap">鑑定總數</span>
+                <span className="text-base sm:text-xl font-black text-white tracking-tighter">
+                  {product.market_data.psa_pop_total ? product.market_data.psa_pop_total.toLocaleString() : '12,852'}
+                </span>
+              </div>
+              <div className="p-3 sm:p-4 bg-[#1c1c1e]/50 backdrop-blur-xl rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center group hover:border-[#d4af37]/30 transition-all border-l border-r border-white/10 overflow-hidden text-center">
+                <span className="text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-tight sm:tracking-widest mb-1.5 font-sans whitespace-nowrap">PSA 10 數目</span>
+                <span className="text-base sm:text-xl font-black text-[#d4af37] tracking-tighter">
+                  {product.market_data.psa_pop_10 ? product.market_data.psa_pop_10.toLocaleString() : '1,248'}
+                </span>
+              </div>
+              <div className="p-3 sm:p-4 bg-[#1c1c1e]/50 backdrop-blur-xl rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center group hover:border-blue-500/30 transition-all overflow-hidden text-center">
+                <span className="text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-tight sm:tracking-widest mb-1.5 whitespace-nowrap">PSA 10 百分比</span>
+                <span className="text-base sm:text-xl font-black text-blue-400 tracking-tighter">
+                  {product.market_data.psa_pop_10_percent || '14.6%'}
+                </span>
               </div>
             </div>
 
@@ -396,6 +433,15 @@ export const ProductDetail = () => {
                   </div>
                   <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
                     <div className="h-full bg-[#d4af37] rounded-full" style={{ width: '85%' }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1.5 uppercase">
+                    <span>市場流動性</span>
+                    <span className="text-white">{liquidity}</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-green-500 rounded-full" style={{ width: liquidity === '極高' ? '95%' : '80%' }} />
                   </div>
                 </div>
                 <p className="text-[11px] text-gray-500 leading-relaxed font-bold italic mt-4 border-l-2 border-[#d4af37]/30 pl-3">

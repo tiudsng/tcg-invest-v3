@@ -90,30 +90,19 @@ export const AIScan = () => {
       const base64Data = compressedImage.split(",")[1] || compressedImage;
       const mimeType = compressedImage.split(";")[0].split(":")[1] || "image/jpeg";
 
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error("請點擊左下角齒輪圖示 (Settings) 設定 GEMINI_API_KEY");
-      }
-      
-      const cleanKey = process.env.GEMINI_API_KEY.replace(/['"]/g, '').trim();
+      const cleanKey = process.env.GEMINI_API_KEY?.replace(/['"]/g, '').trim() || '';
       const ai = new GoogleGenAI({ apiKey: cleanKey });
       
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: [
-          `Identify this trading card from the image. 
-          1. Find its exact card name and card number (e.g., 201/165).
-          2. CRITICAL: You MUST use the Google Search tool to search for the real, current market value of this specific card (using the name and card number) on SNKRDUNK or other reliable TCG market websites.
-          3. Find the price for both **PSA 10** condition and **RAW** (ungraded) condition.
-          4. Convert the prices to Hong Kong Dollars (HKD) as a number.
-          
-          You MUST return ONLY a valid JSON object without any markdown formatting or code blocks.
-          The JSON must have this exact structure:
           {
-            "name": "Card name in Traditional Chinese or Japanese. Return 'Unknown' if cannot identify.",
-            "cardNumber": "Card number (e.g., 201/165)",
-            "pricePsa10HKD": 1500,
-            "priceRawHKD": 500
-          }`,
+            text: `Identify this trading card from the image. 
+            1. Find its exact card name and card number (e.g., 201/165).
+            2. Search for the real, current market value of this specific card on reliable TCG market websites.
+            3. Find the price for both PSA 10 condition and RAW (ungraded) condition.
+            4. Return the results in Hong Kong Dollars (HKD).`
+          },
           {
             inlineData: {
               data: base64Data,
@@ -122,21 +111,38 @@ export const AIScan = () => {
           }
         ],
         config: {
-          tools: [{ googleSearch: {} }]
+          tools: [{ googleSearch: {} }],
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              name: {
+                type: Type.STRING,
+                description: "Card name in Traditional Chinese or Japanese."
+              },
+              cardNumber: {
+                type: Type.STRING,
+                description: "Card number (e.g., 201/165)"
+              },
+              pricePsa10HKD: {
+                type: Type.NUMBER,
+                description: "Current PSA 10 market price in HKD."
+              },
+              priceRawHKD: {
+                type: Type.NUMBER,
+                description: "Current RAW (ungraded) market price in HKD."
+              }
+            },
+            required: ["name"]
+          }
         }
       });
 
-      const text = response.text;
-      if (!text) {
-        throw new Error("AI 未回傳任何內容");
-      }
-
       let data;
       try {
-        const cleanText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-        data = JSON.parse(cleanText);
+        data = JSON.parse(response.text || '{}');
       } catch (e) {
-        console.error("Invalid JSON response:", text);
+        console.error("Invalid JSON response:", response.text);
         throw new Error(`伺服器回傳了非預期的格式`);
       }
 
@@ -152,8 +158,8 @@ export const AIScan = () => {
       let errorMsg = err.message || '未知錯誤';
       
       // Clean up the Google Gen AI raw JSON error
-      if (typeof errorMsg === 'string' && errorMsg.includes('API key not valid')) {
-        errorMsg = "API Key 無效！請點擊 AI Studio 設定齒輪輸入正確的 GEMINI_API_KEY";
+      if (typeof errorMsg === 'string' && (errorMsg.includes('API key not valid') || errorMsg.includes('invalid character'))) {
+        errorMsg = "AI 功能暫時無法使用，請確認您的帳戶權限或聯繫管理員";
       } else if (typeof errorMsg === 'string' && errorMsg.includes('User location is not supported')) {
         errorMsg = "所在地區不支援呼叫此 API，或請確認您的 API Key 權限";
       } else if (typeof errorMsg === 'string' && errorMsg.includes('{')) {
@@ -165,7 +171,7 @@ export const AIScan = () => {
          } catch(e) {}
          // Handle nested stringified API error
          if (errorMsg.includes('API key not valid')) {
-            errorMsg = "API Key 無效！請點擊 AI Studio 設定齒輪輸入正確的 GEMINI_API_KEY";
+            errorMsg = "AI 功能暫時無法使用，請確認您的帳戶權限或聯繫管理員";
          }
       }
 

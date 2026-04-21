@@ -12,6 +12,7 @@ import { ConditionBadge } from './components/ConditionBadge';
 import { FavoriteButton } from './components/FavoriteButton';
 import { SellerBadge } from './components/SellerBadge';
 import { PriceLeaderboard } from './components/PriceLeaderboard';
+import { ImageCarousel } from './components/ImageCarousel';
 import { cn } from './lib/utils';
 
 const ListingSkeleton = () => (
@@ -422,16 +423,16 @@ export const Home: React.FC = () => {
   const activeFilterCount = filters.conditions.length + filters.cardTypes.length + (filters.minPrice ? 1 : 0) + (filters.maxPrice ? 1 : 0);
 
   return (
-    <div className="pt-32 sm:pt-40 pb-12 px-4 sm:px-8 lg:px-12 max-w-[1600px] mx-auto min-h-screen">
+    <div className="pt-20 sm:pt-28 pb-40 sm:pb-12 px-4 sm:px-8 lg:px-12 max-w-[1600px] mx-auto min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 sm:mb-16 gap-6 sm:gap-8">
         <div className="flex w-full gap-3">
-          <div className="relative flex-grow md:w-[500px]">
+          <div className="relative flex-grow md:w-[600px]">
             <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
               <Search className="h-6 w-6 text-gray-400 dark:text-gray-500" />
             </div>
             <input
               type="text"
-              placeholder="搜尋噴火龍、皮卡丘..."
+              placeholder="輸入卡號 查詢最新市價及尋找心儀卡片..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -439,7 +440,7 @@ export const Home: React.FC = () => {
                   navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
                 }
               }}
-              className="block w-full pl-14 pr-6 py-4.5 bg-gray-100/80 dark:bg-white/5 border-0 rounded-[1.5rem] text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-white/10 transition-all shadow-sm text-base"
+              className="block w-full pl-14 pr-6 py-4.5 bg-gray-100/80 dark:bg-white/5 border-0 rounded-[2rem] text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-white/10 transition-all shadow-sm text-base"
             />
             {searchQuery && (
               <button 
@@ -564,7 +565,7 @@ export const Home: React.FC = () => {
           <div className="flex items-center justify-between mb-4 sm:mb-10">
             <h2 className="text-xl sm:text-3xl font-semibold text-gray-900 dark:text-white flex items-center gap-2 sm:gap-3 tracking-tight">
               <BookOpen className="w-5 h-5 sm:w-8 sm:h-8 text-blue-600" />
-              收藏家指南 🚀
+              收藏家指南
             </h2>
             <Link to="/articles" className="text-sm sm:text-lg text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1 hover:gap-2 transition-all">
               查看全部 <ChevronRight className="w-5 h-5" />
@@ -665,36 +666,25 @@ export const Home: React.FC = () => {
                 <div onClick={() => navigate(`/listing/${listing.id}`)} className="group block h-full cursor-pointer">
                   <div className="bg-white dark:bg-[#1c1c1e] rounded-[2rem] overflow-hidden shadow-sm border border-gray-100 dark:border-white/5 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 h-full flex flex-col">
                     <div className="aspect-[3/4] w-full overflow-hidden bg-gray-100 dark:bg-black relative">
-                      <img 
-                        src={listing.imageUrl} 
-                        alt={listing.title} 
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
-                        referrerPolicy="no-referrer" 
-                        loading="lazy" 
-                        decoding="async" 
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${listing.id}/600/800`;
-                        }}
+                      <ImageCarousel 
+                        images={listing.imageUrls && listing.imageUrls.length > 0 ? listing.imageUrls : (listing.imageUrl ? [listing.imageUrl] : [])} 
+                        title={listing.title} 
+                        id={listing.id} 
+                        showArrows={false}
+                        showImageCount={false}
                       />
-                      {listing.imageUrls && listing.imageUrls.length > 1 && (
-                        <div className="absolute bottom-3 right-3 px-3 py-1 bg-black/60 backdrop-blur-md rounded-xl text-xs font-bold text-white flex items-center gap-1.5 z-10">
-                          <ImageIcon className="w-4 h-4" />
-                          <span>{listing.imageUrls.length}</span>
-                        </div>
-                      )}
-                      <ConditionBadge condition={listing.condition} cardType={listing.cardType} title={listing.title} className="absolute top-2 right-2 sm:top-4 sm:right-4 !h-7 sm:!h-10 shadow-lg" />
                       <FavoriteButton listingId={listing.id} className="absolute top-2 left-2 sm:top-4 sm:left-4 z-20" />
                     </div>
                     <div className="p-4 sm:p-6 flex flex-col flex-grow">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 justify-between">
                         <h3 className="text-sm sm:text-xl font-bold text-gray-900 dark:text-white line-clamp-1 group-hover:text-blue-600 transition-colors flex-1">{listing.title}</h3>
-                        {listing.cardNumber && (
-                          <span className="text-[10px] sm:text-xs font-bold text-gray-400 dark:text-gray-500 whitespace-nowrap">#{listing.cardNumber}</span>
-                        )}
+                        <ConditionBadge condition={listing.condition} cardType={listing.cardType} title={listing.title} className="shadow-none ml-2" />
                       </div>
-                      <p className="text-lg sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3 sm:mb-6 tracking-tight">
-                        HK${(listing.price * 7.8).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-3 sm:mb-6">
+                        <p className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white tracking-tight truncate max-w-full">
+                          HK${listing.price.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </p>
+                      </div>
                       {listing.tags && listing.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-4">
                           {listing.tags.slice(0, 2).map(tag => (
@@ -730,8 +720,8 @@ export const Home: React.FC = () => {
         )
       ) : (
         loadingWants ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-8">
-            {[...Array(8)].map((_, i) => <div key={i} className="bg-white dark:bg-[#1c1c1e] rounded-[2rem] p-8 border border-gray-100 dark:border-white/5 animate-pulse h-40" />)}
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-8">
+            {[...Array(10)].map((_, i) => <div key={i} className="bg-white dark:bg-[#1c1c1e] rounded-[2rem] p-8 border border-gray-100 dark:border-white/5 animate-pulse h-[360px]" />)}
           </div>
         ) : filteredWantListings.length === 0 ? (
           <div className="text-center py-32 bg-gray-50 dark:bg-gray-800/20 rounded-[3rem] border border-gray-100 dark:border-white/5">
@@ -740,7 +730,7 @@ export const Home: React.FC = () => {
             <button onClick={clearFilters} className="text-blue-600 font-semibold text-lg">清除所有篩選</button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-8">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-8">
             {filteredWantListings.map((listing, index) => (
               <motion.div
                 key={listing.id}
@@ -748,67 +738,58 @@ export const Home: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index % 20 * 0.05, duration: 0.5 }}
                 ref={index === filteredWantListings.length - 1 ? lastElementRef : null}
-                className="bg-white dark:bg-[#1c1c1e] rounded-[2rem] p-6 sm:p-8 shadow-sm border border-gray-100 dark:border-white/5 flex flex-col h-full hover:shadow-2xl hover:-translate-y-2 transition-all duration-500"
               >
-                <div className="flex items-start gap-4 sm:gap-6 mb-4 sm:mb-6">
-                  {listing.imageUrl ? (
-                    <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-2xl overflow-hidden shrink-0 border border-gray-200 dark:border-white/10 shadow-md">
-                      <img 
-                        src={listing.imageUrl} 
-                        alt={listing.title} 
-                        className="w-full h-full object-cover" 
-                        referrerPolicy="no-referrer" 
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${listing.id}/300/300`;
-                        }}
+                <div className="group block h-full cursor-default">
+                  <div className="bg-white dark:bg-[#1c1c1e] rounded-[2rem] overflow-hidden shadow-sm border border-gray-100 dark:border-white/5 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 h-full flex flex-col">
+                    <div className="aspect-[3/4] w-full overflow-hidden bg-gray-100 dark:bg-black relative">
+                      <ImageCarousel 
+                        images={listing.imageUrls && listing.imageUrls.length > 0 ? listing.imageUrls : (listing.imageUrl ? [listing.imageUrl] : [])} 
+                        title={listing.title} 
+                        id={listing.id} 
+                        showArrows={false}
+                        showImageCount={false}
                       />
                     </div>
-                  ) : (
-                    <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-gray-50 dark:bg-black/20 flex items-center justify-center shrink-0 border border-dashed border-gray-300 dark:border-gray-700">
-                      <Search className="w-8 h-8 text-gray-400" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                        <ConditionBadge condition={listing.condition || 'Mint'} cardType={listing.cardType} title={listing.title} className="!px-3 !py-1 !text-[10px] !h-auto shadow-sm" />
-                        {listing.cardNumber && (
-                          <span className="px-2 py-0.5 bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 rounded-md text-[10px] font-bold">#{listing.cardNumber}</span>
-                        )}
-                    </div>
-                    <h3 className="text-base sm:text-2xl font-semibold text-gray-900 dark:text-white line-clamp-2 mb-2 tracking-tight">{listing.title}</h3>
-                    <p className="text-xl sm:text-3xl font-semibold text-blue-600 dark:text-blue-400 tracking-tight">
-                      預算 HK${(listing.targetPrice * 7.8).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    </p>
-                    {listing.tags && listing.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-3">
-                        {listing.tags.slice(0, 3).map(tag => (
-                          <span key={tag} className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-md text-[10px] font-bold">
-                            {tag}
-                          </span>
-                        ))}
-                        {listing.tags.length > 3 && (
-                          <span className="text-[10px] text-gray-400 font-bold">+{listing.tags.length - 3}</span>
-                        )}
+                    <div className="p-4 sm:p-6 flex flex-col flex-grow">
+                      <div className="flex items-center gap-2 mb-1 justify-between">
+                        <h3 className="text-sm sm:text-xl font-bold text-gray-900 dark:text-white line-clamp-1 group-hover:text-blue-600 transition-colors flex-1">{listing.title}</h3>
+                        <ConditionBadge condition={listing.condition || 'Mint'} cardType={listing.cardType} title={listing.title} className="shadow-none ml-2" />
                       </div>
-                    )}
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-3 sm:mb-6">
+                        <p className="text-sm sm:text-lg font-semibold text-blue-600 dark:text-blue-400 tracking-tight truncate max-w-full">
+                          預算 HK${listing.targetPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </p>
+                      </div>
+                      {listing.tags && listing.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-4 hidden sm:flex">
+                          {listing.tags.slice(0, 2).map(tag => (
+                            <span key={tag} className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-bold">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-auto pt-4 sm:pt-6 border-t border-gray-100 dark:border-white/5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 sm:gap-3 truncate w-[60%] sm:w-auto">
+                            {listing.userPhoto ? (
+                              <img src={listing.userPhoto} alt={listing.userName} className="w-6 h-6 sm:w-8 sm:h-8 rounded-full border border-gray-200 dark:border-gray-800 shrink-0" referrerPolicy="no-referrer" />
+                            ) : (
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-200 dark:bg-white/10 rounded-full shrink-0" />
+                            )}
+                            <span className="text-xs sm:text-sm font-bold text-gray-600 dark:text-gray-400 truncate">{listing.userName}</span>
+                          </div>
+                          <span className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest shrink-0">
+                            {listing.createdAt ? (
+                              typeof listing.createdAt.toDate === 'function'
+                                ? new Date(listing.createdAt.toDate()).toLocaleDateString()
+                                : new Date(listing.createdAt).toLocaleDateString()
+                            ) : ''}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="mt-auto pt-4 sm:pt-6 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {listing.userPhoto ? (
-                      <img src={listing.userPhoto} alt={listing.userName} className="w-6 h-6 sm:w-8 sm:h-8 rounded-full border border-gray-200 dark:border-gray-800" referrerPolicy="no-referrer" />
-                    ) : (
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-200 dark:bg-white/10 rounded-full" />
-                    )}
-                    <span className="text-xs sm:text-sm font-bold text-gray-600 dark:text-gray-300 truncate max-w-[120px]">{listing.userName}</span>
-                  </div>
-                  <span className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest">
-                    {listing.createdAt ? (
-                      typeof listing.createdAt.toDate === 'function'
-                        ? new Date(listing.createdAt.toDate()).toLocaleDateString()
-                        : new Date(listing.createdAt).toLocaleDateString()
-                    ) : ''}
-                  </span>
                 </div>
               </motion.div>
             ))}

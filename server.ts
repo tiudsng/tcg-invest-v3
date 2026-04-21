@@ -104,7 +104,7 @@ async function startServer() {
           if (!aiClient) {
             await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
               chat_id: chatId,
-              text: `⚠️ 系統未偵測到有效的 GEMINI_API_KEY (目前長度: ${currentKey.length})。請在 Settings > Secrets 中設定。🦞`
+              text: `⚠️ AI 功能暫時未配置，請檢查伺服器環境設定。🦞`
             });
             continue;
           }

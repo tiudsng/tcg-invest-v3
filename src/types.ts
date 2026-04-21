@@ -26,6 +26,7 @@ export interface WantListing {
   condition?: string;
   cardType?: string;
   imageUrl?: string;
+  imageUrls?: string[];
   userName: string;
   userPhoto?: string;
   createdAt?: any;
@@ -52,6 +53,9 @@ export interface Product {
     psa10_price?: number;
     raw_price?: number;
     snkdunk_price?: number;
+    psa_pop_total?: number;
+    psa_pop_10?: number;
+    psa_pop_10_percent?: string;
   };
 }
 

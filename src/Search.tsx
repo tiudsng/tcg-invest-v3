@@ -6,6 +6,8 @@ import { motion } from 'motion/react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Product, Listing } from './types';
 import { getHighResImage, handleImageError } from './lib/imageUtils';
+import { ImageCarousel } from './components/ImageCarousel';
+import { ConditionBadge } from './components/ConditionBadge';
 
 export const Search = () => {
   const [searchParams] = useSearchParams();
@@ -87,7 +89,7 @@ export const Search = () => {
             </div>
             <input
               type="text"
-              placeholder="輸入卡名或卡號 (例如: 123/456)..."
+              placeholder="輸入卡號 查詢最新市價及尋找心儀卡片 (例如: 123/456)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="block w-full pl-14 pr-32 py-5 bg-gray-100 dark:bg-white/5 border-0 rounded-3xl text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 transition-all font-medium text-lg"
@@ -178,24 +180,22 @@ export const Search = () => {
                       to={`/listing/${listing.id}`}
                       className="group bg-white dark:bg-[#111] p-4 rounded-[2.5rem] flex gap-6 border border-gray-100 dark:border-white/5 hover:border-blue-500 transition-all shadow-sm"
                     >
-                      <div className="w-32 aspect-[3/4] bg-gray-100 dark:bg-black rounded-2xl overflow-hidden shrink-0">
-                        <img 
-                          src={listing.imageUrl} 
-                          alt={listing.title}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          referrerPolicy="no-referrer"
+                      <div className="w-32 aspect-[3/4] bg-gray-100 dark:bg-black rounded-2xl overflow-hidden shrink-0 relative">
+                        <ImageCarousel 
+                          images={listing.imageUrls && listing.imageUrls.length > 0 ? listing.imageUrls : (listing.imageUrl ? [listing.imageUrl] : [])} 
+                          title={listing.title} 
+                          id={listing.id} 
+                          showArrows={false}
+                          showImageCount={false}
                         />
                       </div>
                       <div className="flex flex-col justify-between py-2 flex-grow">
                         <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-lg font-black text-gray-900 dark:text-white line-clamp-1">{listing.title}</h3>
-                            {listing.cardNumber && (
-                              <span className="text-[10px] font-black text-gray-400 bg-gray-100 dark:bg-white/5 px-2 py-0.5 rounded-md">#{listing.cardNumber}</span>
-                            )}
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <h3 className="text-lg font-black text-gray-900 dark:text-white line-clamp-1 flex-1">{listing.title}</h3>
+                            <ConditionBadge condition={listing.condition} cardType={listing.cardType} title={listing.title} className="shadow-none ml-2" />
                           </div>
                           <div className="flex items-center gap-4 text-xs font-bold text-gray-400">
-                            <span className="px-2 py-0.5 bg-gray-100 dark:bg-white/5 rounded-md">{listing.condition}</span>
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               24h ago
@@ -203,10 +203,12 @@ export const Search = () => {
                           </div>
                         </div>
                         <div className="flex items-center justify-between items-end">
-                          <span className="text-xl font-black text-blue-600 dark:text-blue-400">
-                            HK$ {listing.price.toLocaleString()}
-                          </span>
-                          <span className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black">
+                          <div className="flex flex-wrap items-center gap-2 max-w-[70%]">
+                            <span className="text-xl font-black text-blue-600 dark:text-blue-400 truncate max-w-full">
+                              HK$ {listing.price.toLocaleString()}
+                            </span>
+                          </div>
+                          <span className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black shrink-0">
                             查看詳情
                           </span>
                         </div>
@@ -228,9 +230,9 @@ export const Search = () => {
             <div className="w-24 h-24 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-8">
               <SearchIcon className="w-10 h-10 text-gray-300" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">開始尋找您的夢幻收藏</h3>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">查詢最新市價及尋找心儀卡片</h3>
             <p className="max-w-md text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
-              您可以輸入寶可夢名稱、由官方資料庫提供的卡號 (如 123/456)，或是任何關鍵字來搜尋。
+              您可以輸入寶可夢名稱、由官方資料庫提供的卡號 (如 123/456)，或是任何關鍵字來查詢最新卡市價及尋找心儀卡片。
             </p>
           </div>
         )}

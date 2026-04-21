@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -199,7 +199,7 @@ export const PriceLeaderboard = () => {
     return (
       <div className="bg-white dark:bg-[#0a0a0a] rounded-3xl py-12 flex flex-col justify-center items-center h-64 border border-gray-100 dark:border-white/5 shadow-sm">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#d4af37] mb-4"></div>
-        <p className="text-[#d4af37] text-sm font-medium">載入排行榜中...</p>
+        <p className="text-[#d4af37] text-sm font-medium">載入十大熱門中...</p>
       </div>
     );
   }
@@ -297,7 +297,7 @@ export const PriceLeaderboard = () => {
               className="w-full bg-[#1c1c1e] rounded-[2.5rem] p-6 flex flex-col items-center justify-center gap-3 active:scale-[0.98] transition-all border border-white/5 hover:bg-[#222]"
             >
               <span className="text-gray-400 text-sm font-black tracking-tight">
-                查看 NO.4 - NO.10 的完整實時排行榜
+                查看 NO.4 - NO.10 的完整實時十大熱門
               </span>
               <div className={`p-2 rounded-full bg-white/5 transition-transform duration-500 ${isExpanded ? 'rotate-180' : ''}`}>
                 <ChevronDown className="w-6 h-6 text-white" />

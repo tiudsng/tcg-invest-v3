@@ -48,7 +48,7 @@ export const Admin = () => {
   const isAdmin = user?.email === 'appleyes516@gmail.com';
 
   const handleSeedLeaderboard = async () => {
-    if (!window.confirm('確定要同步排行榜數據嗎？這將會從產品資料庫讀取最新資訊並更新。')) return;
+    if (!window.confirm('確定要同步十大熱門數據嗎？這將會從產品資料庫讀取最新資訊並更新。')) return;
     setIsSeeding(true);
     try {
       // Clear existing rankings
@@ -215,7 +215,7 @@ export const Admin = () => {
         await setDoc(doc(db, 'list_1', item.card_id), finalData);
       }
 
-      toast.success('排行榜已同步最新數據！');
+      toast.success('十大熱門已同步最新數據！');
       // Refresh stats
       const leaderboardSnap = await getDocs(collection(db, 'list_1'));
       setStats(prev => ({ ...prev, totalLeaderboard: leaderboardSnap.size }));
@@ -392,7 +392,7 @@ export const Admin = () => {
                 <BarChart3 className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">排行榜項目</p>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">十大熱門項目</p>
                 <p className="text-2xl font-black text-gray-900 dark:text-white">{stats.totalLeaderboard}</p>
               </div>
             </div>
