@@ -1,3 +1,3 @@
-# TCG Invest
+# TCG Invest V3
 
-Price data update: 2026-04-23T13:03:42.411318
+Last price update: 2026-04-24 11:18:55
