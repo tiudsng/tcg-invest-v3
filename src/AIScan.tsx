@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import { X, Image as ImageIcon, Settings, Check, ChevronDown, Loader2, Camera, FolderUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { toast } from 'sonner';
 import { compressImage, compressBase64 } from './lib/imageUtils';
 
@@ -90,59 +90,27 @@ export const AIScan = () => {
       const base64Data = compressedImage.split(",")[1] || compressedImage;
       const mimeType = compressedImage.split(";")[0].split(":")[1] || "image/jpeg";
 
-      const cleanKey = process.env.GEMINI_API_KEY?.replace(/['"]/g, '').trim() || '';
-      const ai = new GoogleGenAI({ apiKey: cleanKey });
-      
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          {
-            text: `Identify this trading card from the image. 
-            1. Find its exact card name and card number (e.g., 201/165).
-            2. Search for the real, current market value of this specific card on reliable TCG market websites.
-            3. Find the price for both PSA 10 condition and RAW (ungraded) condition.
-            4. Return the results in Hong Kong Dollars (HKD).`
-          },
-          {
-            inlineData: {
-              data: base64Data,
-              mimeType: mimeType
-            }
-          }
-        ],
-        config: {
-          tools: [{ googleSearch: {} }],
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              name: {
-                type: Type.STRING,
-                description: "Card name in Traditional Chinese or Japanese."
-              },
-              cardNumber: {
-                type: Type.STRING,
-                description: "Card number (e.g., 201/165)"
-              },
-              pricePsa10HKD: {
-                type: Type.NUMBER,
-                description: "Current PSA 10 market price in HKD."
-              },
-              priceRawHKD: {
-                type: Type.NUMBER,
-                description: "Current RAW (ungraded) market price in HKD."
-              }
-            },
-            required: ["name"]
-          }
-        }
+      const res = await fetch('/api/analyze-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          image: compressedImage
+        })
       });
 
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || '掃描失敗');
+      }
+
+      const resultText = await res.text();
       let data;
       try {
-        data = JSON.parse(response.text || '{}');
+        data = JSON.parse(resultText);
       } catch (e) {
-        console.error("Invalid JSON response:", response.text);
+        console.error("Invalid JSON response:", resultText);
         throw new Error(`伺服器回傳了非預期的格式`);
       }
 

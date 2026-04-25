@@ -12,12 +12,17 @@ import {
   CheckCircle,
   BarChart3,
   Settings as SettingsIcon,
-  ArrowLeft
+  ArrowLeft,
+  Activity,
+  Loader2
 } from 'lucide-react';
-import { collection, getDocs, query, orderBy, limit, deleteDoc, doc, setDoc, where } from 'firebase/firestore';
-import { db } from './firebase';
+import { collection, getDocs, getDoc, query, orderBy, limit, deleteDoc, doc, setDoc, updateDoc, where } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from './firebase';
+import { syncLeaderboard } from './lib/leaderboardService';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
+import { GoogleGenAI } from '@google/genai';
 
 export const Admin = () => {
   const { user } = useAuth();
@@ -42,188 +47,135 @@ export const Admin = () => {
   });
   const [isSubmittingArticle, setIsSubmittingArticle] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isUpdatingPsa, setIsUpdatingPsa] = useState(false);
+  const [isSyncingStorage, setIsSyncingStorage] = useState(false);
+  const [psaUpdateProgress, setPsaUpdateProgress] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Security check: Only allow specific admin email
   const isAdmin = user?.email === 'appleyes516@gmail.com';
 
   const handleSeedLeaderboard = async () => {
-    if (!window.confirm('確定要同步十大熱門數據嗎？這將會從產品資料庫讀取最新資訊並更新。')) return;
     setIsSeeding(true);
+    const loadingToast = toast.loading('正在準備同步排行榜...');
+    
     try {
-      // Clear existing rankings
-      const querySnapshot = await getDocs(collection(db, 'list_1'));
-      for (const d of querySnapshot.docs) {
-        await deleteDoc(doc(db, 'list_1', d.id));
+      // 1. Get mappings from config
+      const configSnap = await getDoc(doc(db, 'config', 'leaderboard'));
+      let rankings: string[] = [
+        'snkrdunk_146897', 'snkrdunk_107574', 'snkrdunk_164250', 'snkrdunk_128121',
+        'snkrdunk_128117', 'snkrdunk_103080', 'snkrdunk_91323', 'snkrdunk_469638',
+        'snkrdunk_186243', 'snkrdunk_93021'
+      ];
+
+      if (configSnap.exists()) {
+         const data = configSnap.data();
+         if (data.rankings && Array.isArray(data.rankings)) {
+            rankings = data.rankings;
+         }
       }
 
-      const leaderboardData = [
-        {
-          card_id: 'charizard_151_sar',
-          rank: 1,
-          name_zh: '噴火龍 ex (151 SAR)',
-          name_jp: 'リザードンex',
-          card_number: '201/165',
-          set_name: 'SV2a 151',
-          image_url: 'https://images.pokemoncard.io/cards/sv2a/201.png',
-          market_data: { snkrdunk_price: 12800, ebay_price: 13500, change_24h: '+2.4%', status: 'up' }
+      // 2. Loop through and sync one by one
+      for (let i = 0; i < 10; i++) {
+        const rankKey = `rank_${(i + 1).toString().padStart(2, '0')}`;
+        const cardId = rankings[i] || '';
+        
+        if (!cardId) continue;
+
+        toast.loading(`正在同步 NO.${i+1}: ${cardId}...`, { id: loadingToast });
+
+        const res = await fetch('/api/sync-single-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rankKey, cardId })
+        });
+
+        if (!res.ok) {
+           let errMsg = '未知錯誤';
+           try {
+             const contentType = res.headers.get('content-type');
+             if (contentType && contentType.includes('application/json')) {
+               const errData = await res.json();
+               errMsg = errData.error || errMsg;
+             } else {
+               errMsg = `伺服器回應錯誤 (${res.status})`;
+             }
+           } catch (e) {
+             errMsg = `解析錯誤回應失敗 (${res.status})`;
+           }
+           console.warn(`Failed to sync ${rankKey}:`, errMsg);
+        }
+      }
+      
+      toast.success('排行榜數據同步完成！', { id: loadingToast });
+      // Refresh stats
+      const leaderboardSnap = await getDocs(collection(db, 'leaderboard'));
+      setStats(prev => ({ ...prev, totalLeaderboard: leaderboardSnap.size }));
+    } catch (error: any) {
+      console.error('Error seeding leaderboard:', error);
+      toast.error(`同步失敗: ${error.message}`, { id: loadingToast });
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  const handleUpdatePsaPop = async () => {
+    // ... existing ...
+  };
+
+  const handleStorageSync = async () => {
+    setIsSyncingStorage(true);
+    const loadingToast = toast.loading('正在同步圖片到 Firebase Storage...');
+    
+    try {
+      const targets = [
+        { 
+          id: 'snkrdunk_107574', 
+          url: 'https://www.pokemon-card.com/assets/images/card_images/large/SMP/036987_P_AMADOMYUUTSU.jpg' 
         },
-        {
-          card_id: 'van_gogh_pikachu',
-          rank: 2,
-          name_zh: '戴灰氈帽的皮卡丘 (Promo)',
-          name_jp: 'ゴッホ ピカチュウ',
-          card_number: '085/SVP',
-          set_name: 'Promo',
-          image_url: 'https://images.pokemontcg.io/svp/85_hires.png',
-          psa10_hkd: 28000,
-          market_data: { 
-            snkrdunk_price: 28000, 
-            psa10_price: 26743,
-            raw_price: 6160,
-            ebay_price: 28000, 
-            change_24h: '+5.1%', 
-            status: 'up' 
-          }
-        },
-        {
-          card_id: 'mew_151_sar',
-          rank: 3,
-          name_zh: '夢幻 ex (泡泡 SAR)',
-          name_jp: 'ミュウex',
-          card_number: '205/165',
-          set_name: 'SV2a 151',
-          image_url: 'https://images.pokemoncard.io/cards/sv2a/205.png',
-          market_data: { snkrdunk_price: 7200, ebay_price: 7200, change_24h: '+1.2%', status: 'up' }
-        },
-        {
-          card_id: 'mewtwo_armor',
-          rank: 4,
-          name_zh: '武裝夢夢 (特典)',
-          name_jp: 'アーマードミュウツー',
-          card_number: '365/SM-P',
-          set_name: 'SM-P Promo',
-          image_url: 'https://images.pokemoncard.io/cards/smp/365.png',
-          market_data: { snkrdunk_price: 4500, ebay_price: 4500, change_24h: '0.0%', status: 'stable' }
-        },
-        {
-          card_id: 'umbreon_vmax_sa',
-          rank: 5,
-          name_zh: '月亮伊布 VMAX (SA)',
-          name_jp: 'ブラッキーVMAX',
-          card_number: '095/069',
-          set_name: 'S6a Eevee Heroes',
-          image_url: 'https://images.pokemoncard.io/cards/s6a/95.png',
-          market_data: { snkrdunk_price: 18500, ebay_price: 18500, change_24h: '+0.5%', status: 'up' }
-        },
-        {
-          card_id: 'mega_charizard_x_ex_sar',
-          rank: 6,
-          name_zh: 'Mega 噴火龍 X ex (SAR)',
-          name_jp: 'メガリザードンX ex',
-          card_number: '110/080',
-          set_name: 'SV9',
-          image_url: 'https://limitlesstcg.s3.us-east-2.amazonaws.com/pokemon/jp/SV9/110.png',
-          market_data: { snkrdunk_price: 18500, ebay_price: 18500, change_24h: '+25.4%', status: 'up' }
-        },
-        {
-          card_id: 'lillie_sar_sv9',
-          rank: 7,
-          name_zh: '莉莉艾 (SAR) - 團隊報恩',
-          name_jp: 'リーリエ SAR',
-          card_number: '111/080',
-          set_name: 'SV9',
-          image_url: 'https://limitlesstcg.s3.us-east-2.amazonaws.com/pokemon/jp/SV9/111.png',
-          market_data: { snkrdunk_price: 38500, ebay_price: 38500, change_24h: '+12.4%', status: 'up' }
-        },
-        {
-          card_id: 'gengar_masterball',
-          rank: 8,
-          name_zh: '耿鬼 (151 大師球閃)',
-          name_jp: 'ゲンガー',
-          card_number: '094/165',
-          set_name: 'SV2a 151',
-          image_url: 'https://images.pokemoncard.io/cards/sv2a/94.png',
-          market_data: { snkrdunk_price: 2800, ebay_price: 2800, change_24h: '+1.8%', status: 'up' }
-        },
-        {
-          card_id: 'ion_sar',
-          rank: 9,
-          name_zh: '奇樹 (SAR)',
-          name_jp: 'ナンジャモ',
-          card_number: '357/190',
-          set_name: 'SV4a',
-          image_url: 'https://images.pokemoncard.io/cards/sv4a/357.png',
-          market_data: { snkrdunk_price: 1900, ebay_price: 1900, change_24h: '-0.5%', status: 'down' }
-        },
-        {
-          card_id: 'charizard_y_sv9',
-          rank: 10,
-          name_zh: 'Mega 噴火龍 Y ex (SAR)',
-          name_jp: 'メガリザードンY',
-          card_number: 'SV9',
-          set_name: 'SV9',
-          image_url: 'https://placehold.co/400x560/1c1c1e/d4af37?text=Charizard+Y+SV9',
-          market_data: { snkrdunk_price: 9500, ebay_price: 9500, change_24h: '+15.0%', status: 'up' }
+        { 
+          id: 'snkrdunk_128121', 
+          url: 'https://www.pokemon-card.com/assets/images/card_images/large/SV2a/043990_P_MIXYUUEX.jpg' 
         }
       ];
 
-      for (const item of leaderboardData) {
-        // Try to FIND corresponding data in products collection
-        const productsRef = collection(db, 'products');
-        const q = query(
-          productsRef, 
-          where('card_number', '==', item.card_number)
-        );
-        const productSnap = await getDocs(q);
+      for (const target of targets) {
+        toast.loading(`正在下載與上傳 ${target.id}...`, { id: loadingToast });
         
-        let finalData: any = { ...item };
+        // Use the proxy to avoid CORS
+        const response = await fetch(`/api/proxy-image?url=${encodeURIComponent(target.url)}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
-        if (!productSnap.empty) {
-          // Find the best match if multiple products have same card number (e.g. by name)
-          let productData = productSnap.docs[0].data();
-          if (productSnap.docs.length > 1) {
-            const exactNameMatch = productSnap.docs.find(d => d.data().name_zh === item.name_zh);
-            if (exactNameMatch) productData = exactNameMatch.data();
-          }
-
-          // Merge data, prioritizing product data for market info, metadata AND image
-          const productMarket = (productData.market_data || {}) as any;
-          const itemMarket = (item.market_data || {}) as any;
-
-          finalData = {
-            ...productData, // Start with product data
-            ...item,        // Overwrite with leaderboard specific fields (rank, card_id, names)
-            id: item.card_id,
-            market_data: {
-              ...itemMarket,
-              ...productMarket,
-              // Force these to exist
-              snkrdunk_price: productMarket.snkrdunk_price || itemMarket.snkrdunk_price || productData.price || 0,
-              ebay_price: productMarket.ebay_price || itemMarket.ebay_price || productData.price || 0,
-            },
-            image_url: productData.imageUrl || productData.image_url || item.image_url, 
-            rank: item.rank
-          };
-        } else {
-          finalData = {
-            ...item,
-            id: item.card_id
-          };
+        const blob = await response.blob();
+        const fileRef = ref(storage, `card_images/${target.id}.jpg`);
+        
+        // Upload
+        await uploadBytes(fileRef, blob, {
+          contentType: blob.type || 'image/jpeg'
+        });
+        
+        // Get URL
+        const downloadUrl = await getDownloadURL(fileRef);
+        console.log(`[Storage] Uploaded ${target.id} to ${downloadUrl}`);
+        
+        // Update Firestore
+        await updateDoc(doc(db, 'products', target.id), {
+          image_url: downloadUrl
+        });
+        
+        // Also update leaderboard if matches
+        const leaderboardSnap = await getDocs(query(collection(db, 'leaderboard'), where('card_id', '==', target.id)));
+        for (const lDoc of leaderboardSnap.docs) {
+          await updateDoc(lDoc.ref, { image_url: downloadUrl });
         }
-        
-        await setDoc(doc(db, 'list_1', item.card_id), finalData);
       }
 
-      toast.success('十大熱門已同步最新數據！');
-      // Refresh stats
-      const leaderboardSnap = await getDocs(collection(db, 'list_1'));
-      setStats(prev => ({ ...prev, totalLeaderboard: leaderboardSnap.size }));
-    } catch (error) {
-      console.error("Error seeding leaderboard:", error);
-      toast.error('更新失敗');
+      toast.success('圖片存儲同步完成！', { id: loadingToast });
+    } catch (error: any) {
+      console.error("Error syncing storage:", error);
+      toast.error(`同步儲存出錯: ${error.message}`, { id: loadingToast });
     } finally {
-      setIsSeeding(false);
+      setIsSyncingStorage(false);
     }
   };
 
@@ -238,7 +190,7 @@ export const Admin = () => {
         const usersSnap = await getDocs(collection(db, 'users'));
         const listingsSnap = await getDocs(collection(db, 'listings'));
         const wantsSnap = await getDocs(collection(db, 'wantListings'));
-        const leaderboardSnap = await getDocs(collection(db, 'list_1'));
+        const leaderboardSnap = await getDocs(collection(db, 'leaderboard'));
         const productsSnap = await getDocs(collection(db, 'products'));
         const articlesSnap = await getDocs(collection(db, 'articles'));
 
@@ -402,6 +354,74 @@ export const Admin = () => {
               className="w-full py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-400 text-white rounded-xl text-xs font-black transition-colors flex items-center justify-center gap-2"
             >
               {isSeeding ? '更新中...' : '同步最新清單'}
+            </button>
+          </div>
+
+          <div className="bg-white dark:bg-[#1c1c1e] p-6 rounded-[2rem] border-2 border-amber-500/20 dark:border-amber-500/30 shadow-lg relative overflow-hidden">
+            <div className="flex items-center gap-4 mb-4 relative z-10">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                <Activity className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">數據維護</p>
+                <p className="text-2xl font-black text-gray-900 dark:text-white">PSA 人口數據</p>
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-500 mb-4 font-bold">僅更新 Products 集合中的 PSA Population (人口) 數據，不更新市場價格。</p>
+            {isUpdatingPsa && (
+              <div className="mb-4">
+                <div className="flex justify-between text-[10px] font-bold text-amber-500 mb-1">
+                  <span>進度</span>
+                  <span>{psaUpdateProgress}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-amber-500 transition-all duration-300" 
+                    style={{ width: `${psaUpdateProgress}%` }} 
+                  />
+                </div>
+              </div>
+            )}
+            <button 
+              onClick={handleUpdatePsaPop}
+              disabled={isUpdatingPsa}
+              className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-400 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+            >
+              {isUpdatingPsa ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  執行中...
+                </>
+              ) : (
+                '更新 PSA 人口數據 (不含價格)'
+              )}
+            </button>
+          </div>
+
+          <div className="bg-white dark:bg-[#1c1c1e] p-6 rounded-[2rem] border-2 border-orange-500/20 dark:border-orange-500/30 shadow-lg relative overflow-hidden">
+            <div className="flex items-center gap-4 mb-4 relative z-10">
+              <div className="w-12 h-12 rounded-2xl bg-orange-50 dark:bg-orange-500/10 flex items-center justify-center text-orange-600 dark:text-orange-400">
+                <Activity className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">儲存空間維護</p>
+                <p className="text-2xl font-black text-gray-900 dark:text-white">圖片存儲同步</p>
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-500 mb-4 font-bold">下載官方圖片並上傳至 Firebase Storage，然後更新資料庫連結。</p>
+            <button 
+              onClick={handleStorageSync}
+              disabled={isSyncingStorage}
+              className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
+            >
+              {isSyncingStorage ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  同步中...
+                </>
+              ) : (
+                '同步圖片到 Storage'
+              )}
             </button>
           </div>
 

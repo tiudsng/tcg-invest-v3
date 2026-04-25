@@ -38,7 +38,9 @@ export interface Product {
   id?: string;
   card_id: string;
   rank: number;
+  name?: string;
   name_zh: string;
+  name_hk?: string;
   name_jp: string;
   card_number?: string;
   set_name: string;
@@ -57,6 +59,13 @@ export interface Product {
     psa_pop_10?: number;
     psa_pop_10_percent?: string;
   };
+  analysis_quote?: string;
+  investment_metrics?: {
+    growth_potential?: number; // 0-100
+    holding_advice?: string;
+    holding_score?: number; // 0-100
+  };
+  updatedAt?: string | any;
 }
 
 export interface PokemonCard {

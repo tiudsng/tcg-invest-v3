@@ -54,10 +54,15 @@ service cloud.firestore {
 
     match /list_1/{productId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || (request.resource.data.postedBy == 'bot' || request.resource.data.updatedBy == 'bot');
     }
 
-    match /products/{productId} {
+    match /leaderboard/{document=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /products/{document=**} {
       allow read: if true;
       allow write: if true;
     }
@@ -88,9 +93,19 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.userId);
     }
 
-    match /articles/{articleId} {
+    match /config/leaderboard {
+      allow read: if true;
+      allow write: if isAdmin() || (request.resource.data.updatedBy in ['bot', 'bot_agent']);
+    }
+
+    match /config/{docId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    match /articles/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin() || (request.resource.data.postedBy == 'bot');
     }
   }
 }

@@ -70,10 +70,21 @@ export function getImageClass(url?: string): string {
  * Returns the best possible high-resolution image for a card.
  * Handles specific overrides and general high-res conversions.
  */
-export function getHighResImage(url?: string, cardName?: string, setAndNumber?: string): string {
-  if (!url && !cardName) return '';
+export function getHighResImage(url?: string, cardName?: string, setAndNumber?: string, cardId?: string): string {
+  if (!url && !cardName && !cardId) return '';
 
-  // 1. Specific High-Res Overrides (Prioritize manual high-quality mappings)
+  // 1. If we ALREADY have a high-resolution URL (from Pokellector, Limitless, or Japanese Official site), return it!
+  // This is what the user wants: "Read ID then image" (matching IDs in products collection)
+  if (url && (
+    url.includes('pokemontcg.io') || 
+    url.includes('limitlesstcg') || 
+    url.includes('pokemon-card.com') ||
+    (url.includes('pokellector') && !url.includes('.thumb.'))
+  )) {
+    return url;
+  }
+
+  // 2. Specific High-Res Overrides (Prioritize manual high-quality mappings for top cards)
   const name = (cardName || '').toLowerCase();
   const idStr = (setAndNumber || '').toLowerCase();
 
@@ -83,39 +94,69 @@ export function getHighResImage(url?: string, cardName?: string, setAndNumber?: 
     (name.includes('伊布') && name.includes('vmax')) || 
     (name.includes('ブラッキー') && name.includes('vmax')) ||
     name.includes('moonbreon') ||
+    name.includes('月亮伊布') ||
+    name.includes('月光 bibarel') ||
     (idStr.includes('s6a') && (idStr.includes('95') || idStr.includes('095')))
   ) {
-    // Official high-res JP image - highly stable
-    return 'https://www.pokemon-card.com/assets/images/card_images/large/S6a/039433_P_BURAKKIVMAX.jpg';
+    return 'https://www.pokellector.com/Japanese-Eevee-Heroes-Expansion-Set/Umbreon-VMAX-Card-095.png';
   }
 
   // Mew ex (SV2a 205/165)
-  if (idStr.includes('sv2a') && idStr.includes('205')) {
-    return 'https://www.pokemon-card.com/assets/images/card_images/large/SV2a/044195_P_MIYYUUEX.jpg';
+  if ((idStr.includes('sv2a') && idStr.includes('205')) || (name.includes('夢幻') && idStr.includes('205')) || idStr.includes('43990')) {
+    return 'https://www.pokemon-card.com/assets/images/card_images/large/SV2a/043990_P_MIXYUUEX.jpg';
   }
 
-  // Pikachu with Grey Felt Hat (SVP 085)
-  if (name.includes('戴灰') || name.includes('氈帽') || (idStr.includes('svp') && idStr.includes('085'))) {
+  // Pikachu with Grey Felt Hat (Vanish Pikachu - SVP 085)
+  if (name.includes('戴灰') || name.includes('氈帽') || name.includes('梵谷') || (idStr.includes('svp') && idStr.includes('085'))) {
     return 'https://images.pokemontcg.io/svp/85_hires.png';
   }
 
   // Pikachu ex (SV8a 236/187)
-  if ((idStr.includes('sv8a') && idStr.includes('236')) || (name.includes('皮卡丘') && name.includes('ex') && idStr.includes('sv8a'))) {
-    return 'https://www.pokemon-card.com/assets/images/card_images/large/SV8a/047101_P_PIKAOCHYUUEX.jpg';
+  if ((idStr.includes('sv8a') && idStr.includes('236')) || (name.includes('皮卡丘') && name.includes('ex') && (idStr.includes('sv8a') || name.includes('sv8a')))) {
+    return 'https://www.pokellector.com/Japanese-Terastal-Festival-ex-Expansion-Set/Pikachu-ex-Card-236.png';
   }
 
-  // Mega Charizard X ex (SV9 110/080 SAR)
+  // Mega Charizard X ex (SV9 110/080 SAR - Supercharged Breaker)
   if ((idStr.includes('sv9') && idStr.includes('110')) || (name.includes('噴火龍') && name.includes('x') && idStr.includes('sv9'))) {
-    // Top-tier high-res source from Limitless
-    return 'https://limitlesstcg.s3.us-east-2.amazonaws.com/pokemon/jp/SV9/110.png';
+    return 'https://www.pokellector.com/Japanese-Supercharged-Breaker-Expansion-Set/Charizard-ex-Card-110.png';
   }
 
-  // 2. Handling Pokellector Thumbnails - Try both .png and .jpg
+  // Armored Mewtwo (Official Japanese Site 36987 / Promo 365)
+  if ((idStr.includes('sm-p') || idStr.includes('smp')) && (idStr.includes('365') || idStr.includes('36987')) || name.includes('武裝') || name.includes('裝甲') || name.includes('アーマード')) {
+    return 'https://www.pokemon-card.com/assets/images/card_images/large/SMP/036987_P_AMADOMYUUTSU.jpg';
+  }
+
+  // Mew ex SAR (SV4a 347/190)
+  if ((idStr.includes('sv4a') && idStr.includes('347')) || (name.includes('夢幻') && idStr.includes('sv4a'))) {
+    return 'https://www.pokellector.com/Japanese-Shiny-Treasure-ex-Expansion-Set/Mew-ex-Card-347.png';
+  }
+
+  // Lillie SAR (SV5a 191/170)
+  if ((idStr.includes('sv9') && idStr.includes('111')) || (idStr.includes('sv5a') && idStr.includes('191')) || (name.includes('莉莉艾') && (name.includes('sar') || name.includes('sr')))) {
+    return 'https://www.pokellector.com/Japanese-Battle-Boost-Expansion-Set/Lillie-Card-119.png';
+  }
+
+  // Mega Gengar ex SAR (SV9 109/080)
+  if ((idStr.includes('sv9') && idStr.includes('109')) || (name.includes('耿鬼') && (idStr.includes('sv9') || name.includes('m2a')))) {
+    return 'https://www.pokellector.com/Japanese-Supercharged-Breaker-Expansion-Set/Gengar-ex-Card-109.png';
+  }
+
+  // Charizard ex SAR (151 - SV2a 201/165)
+  if ((idStr.includes('sv2a') && idStr.includes('201')) || (name.includes('噴火龍') && name.includes('sar') && idStr.includes('sv2a')) || idStr.includes('43986')) {
+    return 'https://www.pokemon-card.com/assets/images/card_images/large/SV2a/043986_P_RIZADONEX.jpg';
+  }
+
+  // 3. Fallback to Snkrdunk ID mapping if URL is missing or low-res
+  if (cardId && cardId.startsWith('snkrdunk_')) {
+    // The user has uploaded webp images to firebase storage following this naming convention
+    return `https://storage.googleapis.com/gen-lang-client-0326385388.firebasestorage.app/card_images/${cardId}.webp`;
+  }
+
+  // 4. Handling Pokellector Thumbnails
   if (url && url.includes('pokellector.com') && url.includes('.thumb.png')) {
     return url.replace('.thumb.png', '.png');
   }
 
-  // 3. Fallback to provided URL
   return url || '';
 }
 
@@ -123,36 +164,56 @@ export function getHighResImage(url?: string, cardName?: string, setAndNumber?: 
  * Handle image loading errors by trying common fallbacks.
  * Usage: onError={(e) => handleImageError(e, originalUrl, fallbackName)}
  */
-export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event>, originalUrl?: string, name?: string) {
+export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event>, originalUrl?: string, name?: string, setAndNumber?: string) {
   const target = e.currentTarget;
   const currentSrc = target.src;
   
-  // 1. If we tried high-res Pokellector (.png), fall back to official JP large JPG or Limitless
-  if (currentSrc.includes('pokellector.com') && currentSrc.endsWith('.png')) {
-    // Try Limitless TCG pattern if we can guess the set from URL
-    if (currentSrc.includes('S6a')) {
-      target.src = 'https://limitlesstcg.s3.us-east-2.amazonaws.com/pokemon/jp/S6a/S6a_095.png';
+  // 1. If we tried Firebase Storage and it 404s, fall back to the limitlesstcg/official URL
+  if (currentSrc.includes('firebasestorage.app')) {
+     const overrideUrl = getHighResImage(originalUrl, name, setAndNumber); // Call without cardId to get standard manual mappings
+     if (overrideUrl && overrideUrl !== currentSrc && !overrideUrl.includes('firebasestorage.app')) {
+       target.src = overrideUrl;
+       return;
+     }
+
+     if (originalUrl && originalUrl !== currentSrc && !originalUrl.includes('firebasestorage.app')) {
+       target.src = originalUrl;
+       return;
+     }
+  }
+
+  // 2. If we tried pokemontcg.io and it fails, try a different stable set or placeholder
+  if (currentSrc.includes('pokemontcg.io')) {
+    if (currentSrc.includes('swsh7/215')) {
+      target.src = 'https://images.pokemontcg.io/swp/215_hires.png'; // Example alternative
       return;
     }
   }
 
-  // 2. If it's a known high-value card that failed, try official JP large path
-  if (name?.includes('伊布') || name?.includes('Umbreon') || name?.includes('ブラッキー')) {
-    if (currentSrc !== 'https://www.pokemon-card.com/assets/images/card_images/large/S6a/039433_P_BURAKKIVMAX.jpg') {
-      target.src = 'https://www.pokemon-card.com/assets/images/card_images/large/S6a/039433_P_BURAKKIVMAX.jpg';
+  // 3. Specific high-value card fallbacks
+  if (name?.includes('伊布') || name?.includes('Umbreon') || name?.includes('ブラッキー') || name?.includes('月亮')) {
+    if (currentSrc !== 'https://images.pokemontcg.io/swsh7/215_hires.png') {
+      target.src = 'https://images.pokemontcg.io/swsh7/215_hires.png';
       return;
     }
   }
 
-  // 3. If we tried high-res override but it failed, try the original URL if available
-  if (originalUrl && currentSrc !== originalUrl) {
+  if (name?.includes('梵谷') || name?.includes('Van Gogh')) {
+    if (currentSrc !== 'https://images.pokemontcg.io/svp/85_hires.png') {
+      target.src = 'https://images.pokemontcg.io/svp/85_hires.png';
+      return;
+    }
+  }
+
+  // 4. If we tried high-res override but it failed, try the original URL if available
+  if (originalUrl && currentSrc !== originalUrl && !originalUrl.includes('firebasestorage.app')) {
     target.src = originalUrl;
     return;
   }
 
-  // 4. Final fallback: Placeholder
+  // 5. Final fallback: Placeholder
   if (!target.src.includes('placehold.co')) {
     const placeholderName = name ? encodeURIComponent(name) : 'Card';
-    target.src = `https://placehold.co/600x840/1a1a1a/ffffff?text=${placeholderName}`;
+    target.src = `https://placehold.co/600x840/1a1a1a/222222?text=${placeholderName}`;
   }
 }

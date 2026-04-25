@@ -1,7 +1,7 @@
 import React from 'react';
 
 export const ConditionBadge: React.FC<{ condition: string; cardType?: string; title: string; className?: string }> = ({ condition, cardType, className }) => {
-  const displayValue = cardType || condition || '';
+  const displayValue = String(cardType || condition || '');
   const isPSA = displayValue.toUpperCase().startsWith('PSA');
   
   if (isPSA) {

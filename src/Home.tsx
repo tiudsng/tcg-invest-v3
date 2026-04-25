@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { collection, query, orderBy, where, doc, setDoc, arrayUnion, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { collection, query, orderBy, where, doc, setDoc, arrayUnion, limit, getDocs, startAfter, onSnapshot, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db } from './firebase';
 import { Listing, WantListing, PortfolioItem } from './types';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -195,6 +195,8 @@ export const Home: React.FC = () => {
     maxPrice: ''
   });
 
+  const [hasFetchedWants, setHasFetchedWants] = useState(false);
+
   const handleProtectedAction = (e: React.MouseEvent) => {
     if (!user || user.isGuest) {
       e.preventDefault();
@@ -212,7 +214,7 @@ export const Home: React.FC = () => {
         collection(db, 'listings'),
         where('status', '==', 'active'),
         orderBy('createdAt', 'desc'),
-        limit(20)
+        limit(10)
       );
 
       if (!isInitial && lastListingDoc) {
@@ -254,7 +256,7 @@ export const Home: React.FC = () => {
       let q = query(
         collection(db, 'wantListings'),
         orderBy('createdAt', 'desc'),
-        limit(20)
+        limit(10)
       );
 
       if (!isInitial && lastWantDoc) {
@@ -287,30 +289,29 @@ export const Home: React.FC = () => {
     }
   }, [lastWantDoc]);
 
+  useEffect(() => {
+    if (activeTab === 'want' && !hasFetchedWants) {
+      fetchWants(true);
+      setHasFetchedWants(true);
+    }
+  }, [activeTab, hasFetchedWants, fetchWants]);
+
   const handleArticleEdit = (id: string, newUrl: string) => {
     setLocalArticles(prev => prev.map(a => a.id === id ? { ...a, imageUrl: newUrl } : a));
   };
 
-  const fetchArticles = React.useCallback(async () => {
-    try {
-      const q = query(collection(db, 'articles'), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
+  useEffect(() => {
+    // 1. Real-time Articles Listener (Once on mount)
+    const q = query(collection(db, 'articles'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       let dbArticles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
 
-      // Exclude specific unwanted articles using keyword matching for robustness
-      const unwantedKeywords = [
-        "升幅",
-        "市場升溫",
-        "熱抄",
-        "噴火龍"
-      ];
-      
+      const unwantedKeywords = ["升幅", "市場升溫", "熱抄", "噴火龍"];
       dbArticles = dbArticles.filter(article => {
         const title = article.title || "";
         return !unwantedKeywords.some(keyword => title.includes(keyword));
       });
       
-      // Merge static articles with DB articles, avoiding duplicates by ID
       const merged = [...dbArticles];
       ARTICLES.forEach(staticArt => {
         if (!merged.find(a => a.id === staticArt.id)) {
@@ -318,25 +319,24 @@ export const Home: React.FC = () => {
         }
       });
 
-      // Sort all articles by createdAt desc
-      merged.sort((a: any, b: any) => {
+      merged.sort((a, b) => {
         const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : (a.createdAt ? new Date(a.createdAt) : new Date());
         const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : (b.createdAt ? new Date(b.createdAt) : new Date());
         return dateB.getTime() - dateA.getTime();
       });
       
       setLocalArticles(merged);
-    } catch (error) {
-      console.error("Error fetching articles:", error);
+    }, (error) => {
+      console.error("Error listening to articles:", error);
       setLocalArticles(ARTICLES);
-    }
-  }, []);
+    });
 
-  useEffect(() => {
-    fetchArticles();
+    // 2. Initial Fetch for Listings (Once on mount)
     fetchListings(true);
-    fetchWants(true);
-  }, []);
+
+    return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);

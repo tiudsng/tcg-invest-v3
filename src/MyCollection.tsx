@@ -196,7 +196,7 @@ export const MyCollection = () => {
   };
 
   const getCardImage = (item: CollectedCard) => {
-    return getHighResImage(item.image_url, item.name_zh || item.name_jp, `${item.set_name}|${item.card_number}`);
+    return getHighResImage(item.image_url, item.name_zh || item.name_jp, `${item.set_name}|${item.card_number}`, item.card_id);
   };
 
   const handleBack = () => {

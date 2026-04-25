@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { getHighResImage, handleImageError, getImageClass } from './lib/imageUtils';
 import { FavoriteButton } from './components/FavoriteButton';
 import { cleanMarketData } from './lib/priceUtils';
+import { PriceTrend } from './components/PriceTrend';
 
 const SnkrdunkLogo = ({ className = "" }: { className?: string }) => (
   <div className={`rounded-[4px] bg-gradient-to-br from-[#8C133E] via-[#35154E] to-[#070F35] flex flex-col items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] shrink-0 transition-all ${className}`}>
@@ -51,7 +52,7 @@ const MOCK_PRODUCTS: Record<string, Product> = {
     name_jp: 'リザードンex',
     card_number: '201/165',
     set_name: 'SV2a 151',
-    image_url: 'https://images.pokemoncard.io/cards/sv2a/201.png',
+    image_url: 'https://images.pokemontcg.io/me1/199_hires.png',
     market_data: { snkrdunk_price: 12800, ebay_price: 13500, change_24h: '+2.4%', status: 'up' }
   },
   'override_mew_ex_sv2a': {
@@ -62,7 +63,7 @@ const MOCK_PRODUCTS: Record<string, Product> = {
     name_jp: 'ミュウex',
     card_number: '205/165',
     set_name: 'SV2a',
-    image_url: 'https://den-cards.pokellector.com/371/Mew-ex.SV2A.205.48354.png',
+    image_url: 'https://images.pokemontcg.io/me1/205_hires.png',
     market_data: { snkrdunk_price: 7200, ebay_price: 7200, change_24h: '+1.2%', status: 'up' }
   },
   'override_mew_ex': {
@@ -73,7 +74,7 @@ const MOCK_PRODUCTS: Record<string, Product> = {
     name_jp: 'ミュウex',
     card_number: '347/190',
     set_name: 'SV4a',
-    image_url: 'https://www.pokemon-card.com/assets/images/card_images/large/SV4a/045133_P_MIXYUUEX.jpg',
+    image_url: 'https://images.pokemontcg.io/sv4pt5/232_hires.png',
     market_data: { snkrdunk_price: 15828, ebay_price: 15828, change_24h: '+15.4%', status: 'up' }
   },
   'override_pikachu_ex_ur': {
@@ -84,7 +85,7 @@ const MOCK_PRODUCTS: Record<string, Product> = {
     name_jp: 'ピカチュウex',
     card_number: '236/187',
     set_name: 'SV8a',
-    image_url: 'https://den-cards.pokellector.com/406/Pikachu-ex.SV8A.236.55302.png',
+    image_url: 'https://images.pokemontcg.io/sv7/173_hires.png',
     market_data: { snkrdunk_price: 3200, ebay_price: 5100, change_24h: '+2.1%', status: 'up' }
   },
   'mock1': {
@@ -152,7 +153,7 @@ export const ProductDetail = () => {
 
       try {
         let cardData: any = null;
-        let docSnap = await getDoc(doc(db, 'list_1', id));
+        let docSnap = await getDoc(doc(db, 'leaderboard', id));
         
         if (docSnap.exists()) {
           cardData = docSnap.data();
@@ -165,37 +166,17 @@ export const ProductDetail = () => {
         }
         
         if (cardData) {
-          const marketData = (cardData.market_data || {}) as any;
+          const cleanedMarketData = cleanMarketData(docSnap.id, cardData);
           
-          let snkrdunkPrice = cardData.psa10_hkd || marketData.snkrdunk_price || marketData.snkdunk_price || cardData.snkrdunk_price || cardData.price || 0;
-          let ebayPrice = marketData.ebay_price || cardData.ebay_price || cardData.price || 0;
-          let psa10Price = marketData.psa10_price || 0;
-          let rawPrice = marketData.raw_price || 0;
-
-          // Check for and auto-fix the JPY -> HKD erroneous unmapped prices from raw DB imports
-          // Specifically fixing the SNKRDUNK exact value for Charizard ex SAR 151
-          if (docSnap.id === 'ion_sar' || cardData.name_zh?.includes('噴火龍 ex SAR')) {
-            if (ebayPrice > 10000) {
-              // converting 18900 JPY to exact HKD (approx ~964)
-              ebayPrice = Math.round(ebayPrice * 0.051);
-              if (snkrdunkPrice > 10000) snkrdunkPrice = Math.round(snkrdunkPrice * 0.051);
-            }
-          }
-
           setProduct({
             id: docSnap.id,
             ...cardData,
             card_id: cardData.card_id || docSnap.id,
             market_data: {
-              snkrdunk_price: snkrdunkPrice,
-              ebay_price: ebayPrice,
-              psa10_price: psa10Price,
-              raw_price: rawPrice,
-              psa_pop_total: marketData.psa_pop_total || cardData.psa_pop_total || 0,
-              psa_pop_10: marketData.psa_pop_10 || cardData.psa_pop_10 || 0,
-              psa_pop_10_percent: marketData.psa_pop_10_percent || cardData.psa_pop_10_percent || '0%',
-              change_24h: marketData.change_24h || cardData.change_24h || '0%',
-              status: marketData.status || cardData.status || 'stable'
+              ...cleanedMarketData,
+              psa_pop_total: cardData.market_data?.psa_pop_total || cardData.psa_pop_total || 0,
+              psa_pop_10: cardData.market_data?.psa_pop_10 || cardData.psa_pop_10 || 0,
+              psa_pop_10_percent: cardData.market_data?.psa_pop_10_percent || cardData.psa_pop_10_percent || '0%'
             }
           } as Product);
         } else {
@@ -235,10 +216,11 @@ export const ProductDetail = () => {
     );
   }
 
-  const isPos = product.market_data.change_24h?.startsWith('+');
-  const isNeg = product.market_data.change_24h?.startsWith('-');
+  const changeStr = String(product.market_data.change_24h || '');
+  const isPos = changeStr.startsWith('+');
+  const isNeg = changeStr.startsWith('-');
   const changeColor = isPos ? 'text-[#30d158]' : isNeg ? 'text-[#ff453a]' : 'text-gray-400';
-  const changeDisplay = product.market_data.change_24h?.replace('+', '↗').replace('-', '↘') || '-';
+  const changeDisplay = changeStr.replace('+', '↗').replace('-', '↘') || '-';
 
   // Investment Metrics Logic (Simulated based on rank/change)
   const investmentGrade = product.rank <= 3 ? 'S' : product.rank <= 10 ? 'A' : 'B';
@@ -255,7 +237,8 @@ export const ProductDetail = () => {
     return getHighResImage(
       product.image_url || product.imageUrl || (product as any).imageURL,
       product.name_zh || product.name_jp,
-      `${product.set_name}|${product.card_number}`
+      `${product.set_name}|${product.card_number}`,
+      product.id || product.card_id
     ) || `https://placehold.co/600x840/111/d4af37?text=${encodeURIComponent(product.name_zh)}`;
   };
 
@@ -274,7 +257,7 @@ export const ProductDetail = () => {
               alt={product.name_zh} 
               className={getImageClass(getProductImage())}
               referrerPolicy="no-referrer"
-              onError={(e) => handleImageError(e, product.image_url || product.imageUrl || (product as any).imageURL, product.name_zh)}
+              onError={(e) => handleImageError(e, product.image_url || product.imageUrl || (product as any).imageURL, product.name_zh, `${product.set_name}|${product.card_number}`)}
             />
             
             {/* Desktop Zoom Button hint */}
@@ -319,41 +302,41 @@ export const ProductDetail = () => {
           {/* Details Section */}
           <div className="w-full md:w-[45%] p-5 sm:p-8 md:p-12 flex flex-col">
             <div className="mb-8">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6">
+              <div className="flex flex-nowrap items-center gap-1.5 sm:gap-3 mb-6 overflow-x-auto pb-2 scrollbar-none">
                 {/* Investment Grade Badge */}
-                <div className="px-3 py-1 bg-gradient-to-r from-amber-500 to-yellow-600 rounded-full flex items-center gap-1.5 shadow-lg shadow-amber-500/20">
-                  <Zap className="w-3 h-3 text-white fill-white" />
-                  <span className="text-[10px] font-black text-white italic tracking-tighter">LEVEL {investmentGrade} ASSET</span>
+                <div className="px-2 sm:px-3 py-1 bg-gradient-to-r from-amber-500 to-yellow-600 rounded-full flex items-center gap-1 sm:gap-1.5 shadow-lg shadow-amber-500/20 whitespace-nowrap shrink-0">
+                  <Zap className="w-2.5 h-2.5 sm:w-3 h-3 text-white fill-white" />
+                  <span className="text-[8px] sm:text-[10px] font-black text-white italic tracking-tighter uppercase">LEVEL {investmentGrade} ASSET</span>
                 </div>
                 
-                <div className="px-3 py-1 bg-white/5 border border-white/10 rounded-full flex items-center gap-2">
-                  <Activity className="w-3 h-3 text-blue-400" />
-                  <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{liquidity} 流通性</span>
+                <div className="px-2 sm:px-3 py-1 bg-white/5 border border-white/10 rounded-full flex items-center gap-1 sm:gap-2 whitespace-nowrap shrink-0">
+                  <Activity className="w-2.5 h-2.5 sm:w-3 h-3 text-blue-400" />
+                  <span className="text-[8px] sm:text-[10px] font-black text-blue-400 uppercase tracking-widest leading-none">{liquidity} 流通性</span>
                 </div>
-
-                <div className="px-3 py-1 bg-white/5 border border-white/10 rounded-full flex items-center gap-2">
-                  <LineChart className="w-3 h-3 text-purple-400" />
-                  <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">{volatility} 波動率</span>
+                
+                <div className="px-2 sm:px-3 py-1 bg-white/5 border border-white/10 rounded-full flex items-center gap-1 sm:gap-2 whitespace-nowrap shrink-0">
+                  <LineChart className="w-2.5 h-2.5 sm:w-3 h-3 text-purple-400" />
+                  <span className="text-[8px] sm:text-[10px] font-black text-purple-400 uppercase tracking-widest leading-none">{volatility} 波動率</span>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-4 mb-4">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-2">
                 {product.set_name && (
-                  <span className="text-xs font-black text-gray-500 uppercase tracking-widest">
-                    {product.set_name} • SV SERIES
+                  <span className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-widest leading-none">
+                    {product.set_name} • {product.set_code || 'SV'} SERIES
                   </span>
                 )}
                 {product.card_number && (
-                  <span className="text-xs font-black text-gray-400 uppercase tracking-widest bg-white/10 px-2 py-0.5 rounded">
+                  <span className="text-[10px] sm:text-xs font-black text-gray-400 uppercase tracking-widest bg-white/10 px-1.5 py-0.5 rounded leading-none">
                     #{product.card_number}
                   </span>
                 )}
               </div>
               
-              <h1 className="text-3xl sm:text-6xl font-black text-white leading-[0.9] mb-4 tracking-tighter uppercase italic drop-shadow-sm">
-                {product.name_zh}
+              <h1 className="text-3xl sm:text-6xl font-black text-white leading-[0.9] mb-2 tracking-tighter uppercase italic drop-shadow-sm break-words">
+                {product.name || product.name_zh || 'Loading...'}
               </h1>
-              <p className="text-lg sm:text-xl text-gray-400 font-bold tracking-tight opacity-80">{product.name_jp}</p>
+              <p className="text-base sm:text-xl text-gray-400 font-bold tracking-tight opacity-90">{product.name_hk || product.name_jp}</p>
             </div>
 
             {/* Advanced Investment Grid */}
@@ -411,6 +394,11 @@ export const ProductDetail = () => {
               </div>
             </div>
 
+            {/* Price Trend Chart */}
+            <div className="mb-8">
+              <PriceTrend productId={product.card_id || product.id || id || ''} />
+            </div>
+
             {/* Investment Potential Summary */}
             <div className="mb-8 p-6 bg-white/5 rounded-2xl border border-white/5 backdrop-blur-md">
               <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
@@ -420,19 +408,19 @@ export const ProductDetail = () => {
                 <div>
                   <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1.5 uppercase">
                     <span>增值潛力</span>
-                    <span className="text-white">{product.rank <= 5 ? '極強' : '穏健'}</span>
+                    <span className="text-white">{product.investment_metrics?.growth_potential ? (product.investment_metrics.growth_potential >= 80 ? '極強' : '穩健') : (product.rank <= 5 ? '極強' : '穏健')}</span>
                   </div>
                   <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${100 - (product.rank || 0) * 5}%` }} />
+                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${product.investment_metrics?.growth_potential || (100 - (product.rank || 0) * 5)}%` }} />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1.5 uppercase">
                     <span>持有建議</span>
-                    <span className="text-white">長期 (2-3年)</span>
+                    <span className="text-white">{product.investment_metrics?.holding_advice || '長期 (2-3年)'}</span>
                   </div>
                   <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#d4af37] rounded-full" style={{ width: '85%' }} />
+                    <div className="h-full bg-[#d4af37] rounded-full" style={{ width: `${product.investment_metrics?.holding_score || 85}%` }} />
                   </div>
                 </div>
                 <div>
@@ -445,7 +433,11 @@ export const ProductDetail = () => {
                   </div>
                 </div>
                 <p className="text-[11px] text-gray-500 leading-relaxed font-bold italic mt-4 border-l-2 border-[#d4af37]/30 pl-3">
-                  「{product.name_zh} 作為 {product.set_name} 的明星卡牌，其藝術價值與稀有度確保了強大的市場深度與長期升值空間。」
+                  {product.analysis_quote ? (
+                    `「${product.analysis_quote}」`
+                  ) : (
+                    `「${product.name_zh} 作為 ${product.set_name} 的明星卡牌，其藝術價值與稀有度確保了強大的市場深度與長期升值空間。」`
+                  )}
                 </p>
               </div>
             </div>

@@ -131,11 +131,11 @@ export const Search = () => {
                     >
                       <Link to={`/product/${product.card_id || product.id}`} className="block relative aspect-[3/4] p-3 overflow-hidden">
                         <img 
-                          src={getHighResImage(product.image_url, product.name_zh, `${product.set_name}|${product.card_number}`) || `https://placehold.co/600x840/111/d4af37?text=${encodeURIComponent(product.name_zh || '')}`} 
+                          src={getHighResImage(product.image_url, product.name_zh, `${product.set_name}|${product.card_number}`, product.id) || `https://placehold.co/600x840/111/d4af37?text=${encodeURIComponent(product.name_zh || '')}`} 
                           alt={product.name_zh}
                           className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                           referrerPolicy="no-referrer"
-                          onError={(e) => handleImageError(e, product.image_url, product.name_zh)}
+                          onError={(e) => handleImageError(e, product.image_url, product.name_zh, `${product.set_name}|${product.card_number}`)}
                         />
                         <div className="absolute top-3 right-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded-lg text-[10px] font-black text-white uppercase tracking-tighter">
                           {product.card_number || 'N/A'}

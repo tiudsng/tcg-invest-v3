@@ -4,38 +4,20 @@ import cors from "cors";
 import axios from "axios";
 import { createServer as createViteServer } from "vite";
 import path from "path";
-import admin from "firebase-admin";
-import { getFirestore } from "firebase-admin/firestore";
 import { GoogleGenAI } from "@google/genai";
+import { db as dbClient } from "./src/firebase.ts";
 import fs from "fs";
 
-// Load configuration
-const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-const firebaseConfig = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, "utf8")) : null;
-
-// Initialize Firebase Admin
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      projectId: firebaseConfig?.projectId
-    });
-    console.log("Firebase Admin initialized");
-  } catch (error) {
-    console.error("Firebase Admin initialization error:", error);
-  }
-}
-
-const dbAdmin = getFirestore(admin.app(), firebaseConfig?.firestoreDatabaseId);
-
 async function startServer() {
+  console.log("!!! SERVER STARTING - V2.2 - (SCRAPINGBEE REMOVED) !!!");
   const rawKey = process.env.GEMINI_API_KEY || "";
-  const GEMINI_API_KEY = rawKey.replace(/['"]/g, '').trim();
+  const GEMINI_API_KEY = rawKey.trim();
   
-  if (GEMINI_API_KEY) {
+  if (GEMINI_API_KEY && GEMINI_API_KEY.length > 20) {
     const maskedKey = `${GEMINI_API_KEY.substring(0, 4)}...${GEMINI_API_KEY.substring(GEMINI_API_KEY.length - 4)}`;
-    console.log(`GEMINI_API_KEY detected: ${maskedKey} (Length: ${GEMINI_API_KEY.length})`);
+    console.log(`[Server] GEMINI_API_KEY detected: ${maskedKey} (Length: ${GEMINI_API_KEY.length})`);
   } else {
-    console.warn("⚠️ GEMINI_API_KEY is missing in process.env");
+    console.warn("[Server] ⚠️ GEMINI_API_KEY is missing or invalid in process.env");
   }
 
   const app = express();
@@ -45,6 +27,32 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
 
   // API routes
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", time: new Date().toISOString() });
+  });
+
+  // Proxy for downloading images from official site to bypass CORS
+  app.get("/api/proxy-image", async (req, res) => {
+    const imageUrl = req.query.url as string;
+    if (!imageUrl) return res.status(400).send("No URL provided");
+    
+    try {
+      const response = await axios.get(imageUrl, { 
+        responseType: 'arraybuffer',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://www.pokemon-card.com/'
+        }
+      });
+      const contentType = response.headers['content-type'] || 'image/jpeg';
+      res.setHeader('Content-Type', contentType);
+      res.send(Buffer.from(response.data));
+    } catch (error) {
+      console.error("Proxy error:", error);
+      res.status(500).send("Failed to proxy image");
+    }
+  });
+
   app.get("/api/search", async (req, res) => {
     try {
       const { keyword, page } = req.query;
@@ -66,135 +74,292 @@ async function startServer() {
     }
   });
 
-  // Telegram Long Polling (Alternative to Webhook for restricted environments)
-  let lastUpdateId = 0;
-  let isPolling = false;
-
-  async function pollTelegram() {
-    if (!process.env.TELEGRAM_BOT_TOKEN || isPolling) return;
-    isPolling = true;
-    
+  // Snkrdunk Scraping Endpoint utilizing Puppeteer + Gemini
+  app.get("/api/scrape-snkrdunk", async (req, res) => {
+    let browser = null;
     try {
-      const response = await axios.get(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getUpdates`, {
-        params: {
-          offset: lastUpdateId + 1,
-          timeout: 20
+      const { id } = req.query;
+      if (!id || typeof id !== "string") {
+        return res.status(400).json({ error: "Missing or invalid snkrdunk ID" });
+      }
+
+      // SNKRDUNK product URL
+      const targetUrl = `https://snkrdunk.com/products/${id}`;
+
+      console.log(`[Scraper] Fetching Snkrdunk via Puppeteer: ${targetUrl}`);
+      const puppeteer = await import('puppeteer');
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+      });
+
+      const page = await browser.newPage();
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 35000 });
+      await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 2000)));
+
+      // Extract raw text
+      const fullText = await page.evaluate(() => {
+        document.querySelectorAll('script, style, noscript, svg, path, footer, nav').forEach(el => el.remove());
+        return document.body.innerText.replace(/\s+/g, ' ');
+      });
+
+      // Try to find price via selectors first
+      let psa10_jpy: number | null = null;
+      let raw_jpy: number | null = null;
+
+      const extractJpy = (pattern: RegExp) => {
+        const match = fullText.match(pattern);
+        if (match) {
+          const val = match[1].replace(/,/g, '');
+          return parseInt(val, 10);
+        }
+        return null;
+      };
+
+      // Patterns common for Snkrdunk card pages
+      psa10_jpy = extractJpy(/(?:PSA10|PSA\s?10|鑑定品|鑑定済み|鑑定済).*?¥\s?([0-9,]+)/i);
+      raw_jpy = extractJpy(/(?:新品|RAW|未鑑定|通常|未開封).*?¥\s?([0-9,]+)/i);
+
+      // If still null, try general price extraction
+      if (!psa10_jpy) {
+        // Look for the first price if it's potentially PSA10
+        const firstPrice = extractJpy(/¥\s?([0-9,]{3,})/);
+        if (firstPrice) psa10_jpy = firstPrice;
+      }
+
+      const parsedData = {
+        psa10_jpy,
+        raw_jpy,
+        extraction_method: "regex"
+      };
+
+      console.log(`[Scraper] Regex extraction success:`, parsedData);
+      
+      // Send result
+      res.json({
+        id,
+        url: targetUrl,
+        data: parsedData
+      });
+
+    } catch (error: any) {
+      console.error("[Scraper] Error:", error.message);
+      if (error.response) {
+         console.error("[Scraper] Response details:", error.response.data);
+      }
+      res.status(500).json({ error: "Failed to scrape snkrdunk" });
+    } finally {
+      if (browser) await browser.close();
+    }
+  });
+
+  app.post("/api/analyze-image", async (req, res) => {
+    try {
+      const { image } = req.body;
+      if (!image) return res.status(400).json({ error: "Missing image" });
+
+      if (!GEMINI_API_KEY) {
+        return res.status(500).json({ error: "伺服器未配置 GEMINI_API_KEY" });
+      }
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+      const base64Data = image.split(",")[1] || image;
+      const mimeType = image.split(";")[0].split(":")[1] || "image/jpeg";
+
+      const response = await ai.models.generateContent({
+        model: "gemini-flash-latest",
+        contents: [
+          {
+            text: `Identify this trading card from the image. 
+          1. Find its exact card name and card number (e.g., 201/165).
+          2. Search for the real, current market value of this specific card on reliable TCG market websites.
+          3. Find the price for both PSA 10 condition and RAW (ungraded) condition.
+          4. Return the results in Hong Kong Dollars (HKD).
+          Return valid JSON only.`
+          },
+          {
+            inlineData: {
+              data: base64Data,
+              mimeType: mimeType
+            }
+          }
+        ]
+      });
+
+      const resultText = response.text || "{}";
+      const cleanedJson = resultText.replace(/```json|```/g, '');
+      const data = JSON.parse(cleanedJson);
+      res.json(data);
+    } catch (error: any) {
+      console.error("[AIScan] Error:", error.message);
+      res.status(500).json({ error: error.message || "Failed to analyze image" });
+    }
+  });
+
+  // Advanced sync endpoint: Handles scraping + AI analysis + Database write entirely on backend
+  app.post("/api/sync-leaderboard", async (req, res) => {
+    try {
+      const { syncLeaderboard } = await import('./src/lib/leaderboardService');
+      
+      console.log("[SyncTask] Starting full leaderboard sync on backend...");
+      
+      // Use dbClient for server-side updates
+      await syncLeaderboard((msg) => {
+        console.log(`[SyncProgress] ${msg}`);
+      }, dbClient, GEMINI_API_KEY);
+
+      res.json({ success: true, message: "排行榜同步完成" });
+    } catch (error: any) {
+      console.error("[SyncTask] Critical failure:", error);
+      res.status(500).json({ error: error.message || "同步過程出錯" });
+    }
+  });
+
+  app.post("/api/update-psa-pop", async (req, res) => {
+    try {
+      console.log("[PSA Pop] v2.1 Starting bulk update (No ScrapingBee)...");
+      
+      const { collection, getDocs, query, where, doc, setDoc } = await import('firebase/firestore');
+      const productsSnap = await getDocs(collection(dbClient, 'products'));
+      
+      // Also fetch leaderboard to sync it
+      const leaderboardSnap = await getDocs(collection(dbClient, 'leaderboard'));
+      const leaderboardMap = new Map(); // cardId -> rankId
+      leaderboardSnap.docs.forEach(d => {
+        const data = d.data();
+        if (data.card_id) {
+          leaderboardMap.set(data.card_id, d.id);
         }
       });
 
-      const updates = response.data.result;
-      for (const update of updates) {
-        lastUpdateId = update.update_id;
-        const message = update.message;
-        if (!message || !message.text) continue;
+      let updated = 0;
+      let failed = 0;
+      
+      // We'll process them in small batches or sequentially to avoid limits
+      for (const docSnap of productsSnap.docs) {
+        const cardDocId = docSnap.id;
+        const data = docSnap.data();
+        const cardName = data.name_zh || data.name_jp;
+        const cardNumber = data.card_number;
+        
+        if (!cardName || !cardNumber) {
+           failed++;
+           continue;
+        }
 
-        const chatId = message.chat.id;
-        const text = message.text;
+        try {
+           let psaPopTotal = 0;
+           let psaPop10 = 0;
 
-        console.log(`Polling: Received Telegram message: ${text}`);
-
-        if (text.toLowerCase().includes("openclaw") || text.includes("小龍蝦")) {
-          // Thoroughly clean the API key (remove whitespace and any accidental quotes)
-          const rawEnv = process.env.GEMINI_API_KEY || "";
-          const currentKey = rawEnv.replace(/['"]/g, '').trim();
-          
-          console.log(`Telegram bot attempting with key length: ${currentKey.length}, starts with: ${currentKey.substring(0,4)}`);
-          const aiClient = currentKey ? new GoogleGenAI({ apiKey: currentKey }) : null;
-
-          if (!aiClient) {
-            await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-              chat_id: chatId,
-              text: `⚠️ AI 功能暫時未配置，請檢查伺服器環境設定。🦞`
-            });
-            continue;
-          }
-
-          try {
-            const prompt = `
-              User input: "${text}"
-              You are "OpenClaw (小龍蝦)", a market analyst for Pokemon TCG.
-              Based on the user's intent, decide what to do.
-              Return a JSON object:
-              {
-                "action": "post_article" | "reply",
-                "title": "Title (if post)",
-                "content": "Full markdown (if post)",
-                "category": "情報分析",
-                "zone": 1 | 2 | 3 | 0,
-                "reply": "Message back to telegram"
+           // Rely on AI for PSA Population as regular scraping is blocked
+           if (process.env.GEMINI_API_KEY) {
+              try {
+                  const { GoogleGenAI } = await import("@google/genai");
+                  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY.trim() });
+                  const prompt = `Search for the latest official PSA Population data for the Pokemon TCG card: "${cardName}" with number "${cardNumber}". Provide JSON ONLY: { "psa_pop_total": number, "psa_pop_10": number }`;
+                  const response = await ai.models.generateContent({ model: "gemini-flash-latest", contents: prompt });
+                  const result = JSON.parse((response.text||"").replace(/```json|```/g, '') || '{}');
+                  if (result.psa_pop_total) psaPopTotal = result.psa_pop_total;
+                  if (result.psa_pop_10) psaPop10 = result.psa_pop_10;
+              } catch (aiErr: any) {
+                  console.warn(`[PSA Pop] AI lookup failed for ${cardName}: ${aiErr.message}`);
               }
-              ONLY return the JSON.
-            `;
-            const result = await aiClient.models.generateContent({
-              model: "gemini-3-flash-preview",
-              contents: [{ role: "user", parts: [{ text: prompt }] }]
-            });
-            
-            const responseText = result.text.trim().replace(/```json|```/g, "");
-            let actionData;
-            try {
-              actionData = JSON.parse(responseText);
-            } catch (e) {
-              console.error("JSON Parse Error on Gemini response:", responseText);
-              // Fallback for non-JSON response
-              actionData = { action: "reply", reply: responseText };
-            }
+           }
 
-            if (actionData.action === "post_article") {
-              const article = {
-                title: actionData.title,
-                content: actionData.content,
-                category: actionData.category || "情報分析",
-                zone: actionData.zone || 0,
-                author: "OPENCLAW 小龍蝦",
-                imageUrl: `https://picsum.photos/seed/${encodeURIComponent(actionData.title)}/1200/800`,
-                readTime: `${Math.ceil(actionData.content.length / 500)} min read`,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                featured: actionData.zone > 0
+           if (psaPopTotal && psaPop10) {
+              const newPsaData = {
+                psa_pop_total: psaPopTotal,
+                psa_pop_10: psaPop10,
+                psa_pop_10_percent: ((psaPop10 / psaPopTotal) * 100).toFixed(1) + '%'
               };
-              await dbAdmin.collection("articles").add(article);
-            }
 
-            await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-              chat_id: chatId,
-              text: actionData.reply || "發佈成功！🦞"
-            });
-          } catch (aiError: any) {
-            console.error("Gemini AI Error:", aiError.message);
-            await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-              chat_id: chatId,
-              text: `AI 處理出錯: ${aiError.message}`
-            });
-          }
+              // Update Products
+              await setDoc(doc(dbClient, 'products', cardDocId), {
+                market_data: {
+                  ...(data.market_data || {}),
+                  ...newPsaData
+                }
+              }, { merge: true });
+
+              // Update Leaderboard if card exists there
+              if (leaderboardMap.has(cardDocId)) {
+                const rankId = leaderboardMap.get(cardDocId);
+                const rankDoc = leaderboardSnap.docs.find(d => d.id === rankId);
+                const rankData = rankDoc?.data() || {};
+                
+                await setDoc(doc(dbClient, 'leaderboard', rankId), {
+                  market_data: {
+                    ...(rankData.market_data || {}),
+                    ...newPsaData
+                  }
+                }, { merge: true });
+                console.log(`[PSA Pop] Updated Leaderboard entry: ${rankId} for ${cardDocId}`);
+              }
+
+              updated++;
+           } else {
+              failed++;
+           }
+        } catch (e: any) {
+           console.warn(`[PSA Pop] Failed for ${cardName}: ${e.message}`);
+           failed++;
         }
       }
-    } catch (error: any) {
-      if (error.response?.status === 409) {
-        console.warn("Telegram 409 Conflict: Another instance might be running. Waiting 5s...");
-        isPolling = false;
-        setTimeout(pollTelegram, 5000);
-        return;
-      }
-      console.error("Polling Error:", error.message);
-    }
-    
-    isPolling = false;
-    setTimeout(pollTelegram, 2000);
-  }
 
-  // Start Polling if Token exists
-  if (process.env.TELEGRAM_BOT_TOKEN) {
-    pollTelegram();
-    console.log("Telegram Polling started...");
+      console.log(`[PSA Pop] Finished. Updated: ${updated}, Failed: ${failed}`);
+      res.json({ success: true, total: productsSnap.size, updated, failed });
+    } catch (error: any) {
+      console.error("[PSA Pop] Fatal error:", error);
+      res.status(500).json({ error: error.message || "同步過程出錯" });
+    }
+  });
+
+  // Sync a single card: Used by frontend to avoid aggregate timeout
+  app.post("/api/sync-single-card", async (req, res) => {
+    try {
+      const { rankKey, cardId } = req.body;
+      if (!rankKey || !cardId) return res.status(400).json({ error: "Missing rankKey or cardId" });
+
+      if (!GEMINI_API_KEY) {
+        console.warn("[SyncTask] Notice: GEMINI_API_KEY is not configured. Sync will proceed without AI analysis.");
+      }
+      
+      const { syncSingleCard } = await import('./src/lib/leaderboardService.ts');
+      console.log(`[SyncTask] Syncing single card: ${rankKey} -> ${cardId} (Key: ${GEMINI_API_KEY.substring(0, 5)}...)`);
+      
+      const result = await syncSingleCard(rankKey, cardId, dbClient, GEMINI_API_KEY);
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      console.error("[SyncTask] Single card failure:", error);
+      res.status(500).json({ error: error.message || "同步單卡出錯" });
+    }
+  });
+
+  // Start Unified Telegram Bot
+  try {
+    const { startBot } = await import('./src/bot.ts');
+    startBot().catch(err => console.error("Async Bot Error:", err));
+  } catch (err) {
+    console.error("Failed to start Telegraf bot:", err);
   }
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+    try {
+      const vite = await createViteServer({
+        server: { 
+          middlewareMode: true,
+          allowedHosts: true,
+          hmr: process.env.DISABLE_HMR === 'true' ? false : { port: 24678 }
+        },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.error("Failed to start Vite Server", e);
+    }
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
@@ -203,8 +368,17 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 [Server] Running on http://0.0.0.0:${PORT}`);
+    console.log(`🚀 [Server] Node Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`❌ [Server] Port ${PORT} is already in use.`);
+    } else {
+      console.error(`❌ [Server] Listen error:`, err);
+    }
   });
 }
 
