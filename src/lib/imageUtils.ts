@@ -88,17 +88,16 @@ export function getHighResImage(url?: string, cardName?: string, setAndNumber?: 
   const name = (cardName || '').toLowerCase();
   const idStr = (setAndNumber || '').toLowerCase();
 
-  // Moonbreon (Umbreon VMAX Alt Art - S6a 095/069)
+  // Moonbreon (Umbreon VMAX Alt Art - S6a 095/069) - pokemontcg.io English set "swsh7"
   if (
-    (name.includes('umbreon') && name.includes('vmax')) || 
-    (name.includes('伊布') && name.includes('vmax')) || 
+    (name.includes('umbreon') && name.includes('vmax')) ||
+    (name.includes('伊布') && name.includes('vmax')) ||
     (name.includes('ブラッキー') && name.includes('vmax')) ||
     name.includes('moonbreon') ||
     name.includes('月亮伊布') ||
-    name.includes('月光 bibarel') ||
     (idStr.includes('s6a') && (idStr.includes('95') || idStr.includes('095')))
   ) {
-    return 'https://www.pokellector.com/Japanese-Eevee-Heroes-Expansion-Set/Umbreon-VMAX-Card-095.png';
+    return 'https://images.pokemontcg.io/swsh7/215_hires.png';
   }
 
   // Mew ex (SV2a 205/165)
