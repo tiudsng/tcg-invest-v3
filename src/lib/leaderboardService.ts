@@ -345,7 +345,20 @@ export async function syncSingleCard(rankKey: string, cardId: string, dbOverride
     if (pSnap.exists && (typeof pSnap.exists === 'function' ? pSnap.exists() : pSnap.exists)) {
       const p = pSnap.data ? pSnap.data() : pSnap.data;
       if (p) {
-        finalData = { ...finalData, name_zh: p.name_zh || p.name || finalData.name_zh, name_jp: p.name_jp || finalData.name_jp, card_number: p.card_number || finalData.card_number, set_name: p.set_name || finalData.set_name, image_url: p.image_url || finalData.image_url };
+        finalData = { 
+          ...finalData, 
+          name_zh: p.name_zh || p.name || finalData.name_zh, 
+          name_jp: p.name_jp || finalData.name_jp, 
+          card_number: p.card_number || finalData.card_number, 
+          set_name: p.set_name || finalData.set_name, 
+          image_url: p.image_url || finalData.image_url,
+          // ✅ FIX: Also update market data fields that were previously missing
+          pokeca_url: p.pokeca_url || finalData.pokeca_url,
+          psa10_hkd: p.psa10_hkd || p.market_data?.psa10_price || finalData.psa10_hkd,
+          source: 'pokeca-chart.com',
+          // Merge market_data if present in product
+          market_data: p.market_data ? { ...finalData.market_data, ...p.market_data } : finalData.market_data
+        };
       }
     }
   } catch(e) {

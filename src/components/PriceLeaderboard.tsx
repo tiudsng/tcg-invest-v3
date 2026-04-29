@@ -190,8 +190,8 @@ export const PriceLeaderboard = () => {
           } as Product;
         });
 
-        // Ensure array order matches rank
-        productsData.sort((a, b) => (a.rank || 0) - (b.rank || 0));
+        // Ensure array order matches rank (parse as numbers to avoid string concatenation)
+        productsData.sort((a, b) => (Number(a.rank) || 0) - (Number(b.rank) || 0));
 
         if (productsData.length === 0) {
           setProducts(MOCK_PRODUCTS);
@@ -201,11 +201,17 @@ export const PriceLeaderboard = () => {
         setLoading(false);
       } catch (err) {
         console.error("Error processing leaderboard data:", err);
-        setProducts(MOCK_PRODUCTS);
+        // Distinguish network vs data error for better debugging
+        if (err instanceof Error && err.name === 'FirebaseError') {
+          console.warn("[PriceLeaderboard] Network error - keeping existing products state");
+        } else {
+          console.warn("[PriceLeaderboard] Data parsing error - falling back to MOCK_PRODUCTS");
+          setProducts(MOCK_PRODUCTS);
+        }
         setLoading(false);
       }
     }, (error) => {
-      console.error("Error fetching leaderboard from leaderboard:", error);
+      console.error("Error fetching leaderboard from Firestore:", error);
       setProducts(MOCK_PRODUCTS);
       setLoading(false);
     });

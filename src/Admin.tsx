@@ -75,37 +75,33 @@ export const Admin = () => {
          }
       }
 
-      // 2. Loop through and sync one by one
-      for (let i = 0; i < 10; i++) {
+      // 2. Sync all cards in PARALLEL for better performance
+      const syncPromises = rankings.map((cardId, i) => {
+        if (!cardId) return Promise.resolve();
         const rankKey = `rank_${(i + 1).toString().padStart(2, '0')}`;
-        const cardId = rankings[i] || '';
-        
-        if (!cardId) continue;
-
         toast.loading(`正在同步 NO.${i+1}: ${cardId}...`, { id: loadingToast });
-
-        const res = await fetch('/api/sync-single-card', {
+        return fetch('/api/sync-single-card', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rankKey, cardId })
+        }).then(async res => {
+          if (!res.ok) {
+            let errMsg = `伺服器回應錯誤 (${res.status})`;
+            try {
+              const contentType = res.headers.get('content-type');
+              if (contentType && contentType.includes('application/json')) {
+                const errData = await res.json();
+                errMsg = errData.error || errMsg;
+              }
+            } catch (e) {}
+            console.warn(`Failed to sync ${rankKey}:`, errMsg);
+          }
+        }).catch(err => {
+          console.warn(`Network error syncing ${rankKey}:`, err);
         });
-
-        if (!res.ok) {
-           let errMsg = '未知錯誤';
-           try {
-             const contentType = res.headers.get('content-type');
-             if (contentType && contentType.includes('application/json')) {
-               const errData = await res.json();
-               errMsg = errData.error || errMsg;
-             } else {
-               errMsg = `伺服器回應錯誤 (${res.status})`;
-             }
-           } catch (e) {
-             errMsg = `解析錯誤回應失敗 (${res.status})`;
-           }
-           console.warn(`Failed to sync ${rankKey}:`, errMsg);
-        }
-      }
+      });
+      
+      await Promise.all(syncPromises);
       
       toast.success('排行榜數據同步完成！', { id: loadingToast });
       // Refresh stats
