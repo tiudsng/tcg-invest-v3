@@ -34,6 +34,37 @@ export async function startBot() {
   }
 }
 
+/**
+ * Send a notification to the admin via Telegram.
+ * Uses TELEGRAM_BOT_TOKEN and ADMIN_CHAT_ID from environment variables.
+ * @param message Markdown-formatted message to send
+ * @param chatIdOverride Optional override for the target chat ID
+ * @returns true if sent successfully, false otherwise
+ */
+export async function sendAdminNotification(message: string, chatIdOverride?: string): Promise<boolean> {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN?.replace(/['"]/g, '').trim();
+  const adminChatId = chatIdOverride || process.env.ADMIN_CHAT_ID;
+
+  if (!botToken || !adminChatId) {
+    console.warn('[sendAdminNotification] Missing TELEGRAM_BOT_TOKEN or ADMIN_CHAT_ID');
+    return false;
+  }
+
+  try {
+    const { default: axios } = await import('axios');
+    await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      chat_id: adminChatId,
+      text: message,
+      parse_mode: 'Markdown',
+    });
+    console.log(`[sendAdminNotification] Message sent to ${adminChatId}`);
+    return true;
+  } catch (err: any) {
+    console.warn('[sendAdminNotification] Failed to send Telegram notification:', err.message);
+    return false;
+  }
+}
+
 if (bot) {
   bot.command('google', (ctx) => ctx.reply('Welcome! I am your TCG Invest Manager Bot. Use /setranks <ID1> <ID2>... to set order, /updateleaderboard to sync, /listArticles to see info, and /deleteArticle <id> to remove them.'));
 

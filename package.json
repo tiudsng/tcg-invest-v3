@@ -20,7 +20,7 @@
     "@tailwindcss/vite": "^4.1.14",
     "@types/puppeteer": "^7.0.4",
     "@vitejs/plugin-react": "^5.0.4",
-    "axios": "^1.15.0",
+    "axios": "^1.15.2",
     "browser-image-compression": "^2.0.2",
     "cheerio": "^1.2.0",
     "clsx": "^2.1.1",

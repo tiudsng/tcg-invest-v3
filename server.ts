@@ -346,7 +346,8 @@ async function startServer() {
       console.log(`[MissCard] Searching for: ${keyword}`);
 
       // Dynamic import to avoid circular deps
-        const { searchMissingCard } = await import('./src/lib/snkrdunkSearchService.ts');
+      const { searchMissingCard } = await import('./src/lib/snkrdunkSearchService.ts');
+      const { sendAdminNotification } = await import('./src/bot.ts');
       const result = await searchMissingCard(keyword);
 
       if (result.found) {
@@ -361,24 +362,10 @@ async function startServer() {
         if (result.pokeca_url) message += `• PokecaChart: ${result.pokeca_url}\n`;
         message += `\n_Source: ${result.source}_`;
 
-        // Send Telegram notification if ADMIN_CHAT_ID is set
-        const adminChatId = process.env.ADMIN_CHAT_ID;
-        const botToken = process.env.TELEGRAM_BOT_TOKEN;
+        // Send Telegram notification via unified function
+        const notified = await sendAdminNotification(message, chat_id);
 
-        if (adminChatId && botToken) {
-          try {
-            await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-              chat_id: adminChatId,
-              text: message,
-              parse_mode: 'Markdown',
-            });
-            console.log(`[MissCard] Notification sent to admin ${adminChatId}`);
-          } catch (notifyErr: any) {
-            console.warn('[MissCard] Failed to send Telegram notification:', notifyErr.message);
-          }
-        }
-
-        res.json({ success: true, found: true, data: result, notified: !!adminChatId });
+        res.json({ success: true, found: true, data: result, notified });
       } else {
         res.json({ success: true, found: false, error: result.error });
       }
