@@ -95,8 +95,8 @@ async function searchSnkrdunk(keyword: string): Promise<Partial<SearchResult>> {
 
 async function searchPokecaChart(keyword: string): Promise<Partial<SearchResult>> {
   try {
-    // Try grading.pokeca-chart.com search (more server-friendly)
-    const searchUrl = `https://grading.pokeca-chart.com/search?q=${encodeURIComponent(keyword)}`;
+    // Use pokemon-card.com API (server-friendly)
+    const searchUrl = `https://www.pokemon-card.com/card-search/resultAPI.php?keyword=${encodeURIComponent(keyword)}&page=1`;
     const response = await axios.get(searchUrl, {
       headers: { 
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -106,30 +106,20 @@ async function searchPokecaChart(keyword: string): Promise<Partial<SearchResult>
     });
     
     const data = response.data;
-    if (data && (data.results || data.cards || data.items)) {
-      const results = data.results || data.cards || data.items;
-      if (results.length > 0) {
-        const first = results[0];
-        return {
-          found: true, source: 'pokeca',
-          pokeca_url: first.url || first.slug ? `https://grading.pokeca-chart.com/${first.url || first.slug}` : null,
-          card_name: first.name || first.cardName,
-          card_number: first.cardNumber || first.number,
-          set_code: first.set || first.series,
-        };
-      }
-    }
-    
-    // Fallback: try pokeca-chart.com all-card search
-    const allCardUrl = `https://pokeca-chart.com/all-card/?search_word=${encodeURIComponent(keyword)}`;
-    const htmlResponse = await axios.get(allCardUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      timeout: 10000,
-    });
-    const html = htmlResponse.data as string;
-    const cardMatch = html.match(/href="(\/card\/[^"]+)"/);
-    if (cardMatch) {
-      return { found: true, source: 'pokeca', pokeca_url: `https://pokeca-chart.com${cardMatch[1]}` };
+    if (data && data.cardList && data.cardList.length > 0) {
+      const first = data.cardList[0];
+      // Build pokeca URL from card data
+      // Card IDs are numeric, need to convert to pokeca slug format
+      const cardId = first.cardID;
+      const cardName = first.cardNameViewText || first.cardNameAltText;
+      // For now, just return the card info - user can search manually
+      return {
+        found: true, source: 'pokeca',
+        pokeca_url: null, // No direct URL without knowing the set/card format
+        card_name: cardName,
+        card_number: cardId,
+        set_code: null,
+      };
     }
     
     return { found: false };
