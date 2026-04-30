@@ -177,9 +177,26 @@ app.post("/api/report-missing-card", async (req, res) => {
       if (result.pokeca_url) message += `• PokecaChart: ${result.pokeca_url}\n`;
       message += `\n_Source: ${result.source}_`;
 
-      // Send Telegram notification via unified function
-      const { sendAdminNotification } = await import('../src/bot.ts');
-      const notified = await sendAdminNotification(message);
+      // Send Telegram notification directly
+      const botToken = process.env.TELEGRAM_BOT_TOKEN?.replace(/['"]/g, '').trim();
+      const adminChatId = process.env.ADMIN_CHAT_ID;
+      let notified = false;
+
+      if (botToken && adminChatId) {
+        try {
+          await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            chat_id: adminChatId,
+            text: message,
+            parse_mode: 'Markdown',
+          });
+          notified = true;
+          console.log(`[MissCard] Telegram notification sent to ${adminChatId}`);
+        } catch (notifyErr: any) {
+          console.warn('[MissCard] Telegram notification failed:', notifyErr.message);
+        }
+      } else {
+        console.warn('[MissCard] Missing TELEGRAM_BOT_TOKEN or ADMIN_CHAT_ID');
+      }
 
       res.json({ success: true, found: true, data: result, notified });
     } else {
