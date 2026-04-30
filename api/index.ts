@@ -45,27 +45,54 @@ const knownCards: Record<string, string> = {
 
 async function searchSnkrdunk(keyword: string): Promise<Partial<SearchResult>> {
   try {
-    let name = keyword;
-    for (const [key, val] of Object.entries(knownCards)) {
-      if (keyword.toLowerCase().includes(key)) { name = val; break; }
-    }
-    const searchUrl = `https://snkrdunk.com/en/trading-cards/search?q=${encodeURIComponent(name)}&category=pokemon`;
+    // Try to scrape SNKRDUNK search page HTML
+    const searchUrl = `https://snkrdunk.com/en/trading-cards/search?q=${encodeURIComponent(keyword)}&category=pokemon`;
     const response = await axios.get(searchUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
-      timeout: 10000,
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      timeout: 15000,
     });
-    const results = response.data?.results || response.data?.items || [];
-    if (results.length > 0) {
-      const first = results[0];
-      return {
-        found: true, source: 'snkrdunk',
-        snkrdunk_id: first.id || first.snkrdunk_id,
-        snkrdunk_url: `https://snkrdunk.com/en/trading-cards/${first.id || first.snkrdunk_id}/used`,
-        card_name: first.name || first.title,
-        card_number: first.card_number || first.product_code,
-        set_code: first.set_code || first.brand,
-      };
+    
+    const html = response.data as string;
+    
+    // Try to find card links from HTML
+    // SNKRDUNK uses data attributes or JSON embedded in page
+    const jsonMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({.+?});/s);
+    if (jsonMatch) {
+      try {
+        const state = JSON.parse(jsonMatch[1]);
+        const products = state?.products || state?.search?.products || state?.items || [];
+        if (products.length > 0) {
+          const first = products[0];
+          return {
+            found: true, source: 'snkrdunk',
+            snkrdunk_id: first.id || first.productId,
+            snkrdunk_url: `https://snkrdunk.com/en/trading-cards/${first.id || first.productId}/used`,
+            card_name: first.name || first.title,
+            card_number: first.cardNumber || first.productCode,
+            set_code: first.setCode || first.brand,
+          };
+        }
+      } catch {}
     }
+    
+    // Fallback: try to find card URLs in HTML
+    const cardLinkMatch = html.match(/href="(\/en\/trading-cards\/[^"]+)"/);
+    if (cardLinkMatch) {
+      const path = cardLinkMatch[1];
+      const idMatch = path.match(/\/en\/trading-cards\/([^/]+)/);
+      if (idMatch) {
+        return {
+          found: true, source: 'snkrdunk',
+          snkrdunk_id: idMatch[1],
+          snkrdunk_url: `https://snkrdunk.com${path}`,
+        };
+      }
+    }
+    
     return { found: false };
   } catch (e: any) {
     return { found: false, error: e.message };
