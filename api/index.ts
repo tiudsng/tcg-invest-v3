@@ -45,21 +45,19 @@ const knownCards: Record<string, string> = {
 
 async function searchSnkrdunk(keyword: string): Promise<Partial<SearchResult>> {
   try {
-    // Try to scrape SNKRDUNK search page HTML
+    // Try SNKRDUNK HTML search page
     const searchUrl = `https://snkrdunk.com/en/trading-cards/search?q=${encodeURIComponent(keyword)}&category=pokemon`;
     const response = await axios.get(searchUrl, {
       headers: { 
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
       },
       timeout: 15000,
     });
     
     const html = response.data as string;
     
-    // Try to find card links from HTML
-    // SNKRDUNK uses data attributes or JSON embedded in page
+    // Try JSON embedded in page
     const jsonMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({.+?});/s);
     if (jsonMatch) {
       try {
@@ -85,11 +83,7 @@ async function searchSnkrdunk(keyword: string): Promise<Partial<SearchResult>> {
       const path = cardLinkMatch[1];
       const idMatch = path.match(/\/en\/trading-cards\/([^/]+)/);
       if (idMatch) {
-        return {
-          found: true, source: 'snkrdunk',
-          snkrdunk_id: idMatch[1],
-          snkrdunk_url: `https://snkrdunk.com${path}`,
-        };
+        return { found: true, source: 'snkrdunk', snkrdunk_id: idMatch[1], snkrdunk_url: `https://snkrdunk.com${path}` };
       }
     }
     
@@ -101,16 +95,43 @@ async function searchSnkrdunk(keyword: string): Promise<Partial<SearchResult>> {
 
 async function searchPokecaChart(keyword: string): Promise<Partial<SearchResult>> {
   try {
-    const searchUrl = `https://pokeca-chart.com/?search_word=${encodeURIComponent(keyword)}`;
+    // Try grading.pokeca-chart.com search (more server-friendly)
+    const searchUrl = `https://grading.pokeca-chart.com/search?q=${encodeURIComponent(keyword)}`;
     const response = await axios.get(searchUrl, {
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      },
+      timeout: 10000,
+    });
+    
+    const data = response.data;
+    if (data && (data.results || data.cards || data.items)) {
+      const results = data.results || data.cards || data.items;
+      if (results.length > 0) {
+        const first = results[0];
+        return {
+          found: true, source: 'pokeca',
+          pokeca_url: first.url || first.slug ? `https://grading.pokeca-chart.com/${first.url || first.slug}` : null,
+          card_name: first.name || first.cardName,
+          card_number: first.cardNumber || first.number,
+          set_code: first.set || first.series,
+        };
+      }
+    }
+    
+    // Fallback: try pokeca-chart.com all-card search
+    const allCardUrl = `https://pokeca-chart.com/all-card/?search_word=${encodeURIComponent(keyword)}`;
+    const htmlResponse = await axios.get(allCardUrl, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
       timeout: 10000,
     });
-    const html = response.data as string;
-    const match = html.match(/href="(\/card\/[^"]+)"/);
-    if (match) {
-      return { found: true, source: 'pokeca', pokeca_url: `https://pokeca-chart.com${match[1]}` };
+    const html = htmlResponse.data as string;
+    const cardMatch = html.match(/href="(\/card\/[^"]+)"/);
+    if (cardMatch) {
+      return { found: true, source: 'pokeca', pokeca_url: `https://pokeca-chart.com${cardMatch[1]}` };
     }
+    
     return { found: false };
   } catch (e: any) {
     return { found: false, error: e.message };
