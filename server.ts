@@ -337,6 +337,57 @@ async function startServer() {
     }
   });
 
+  // Report missing card → search SNKRDUNK + PokecaChart, notify admin
+  app.post("/api/report-missing-card", async (req, res) => {
+    try {
+      const { keyword, chat_id } = req.body;
+      if (!keyword) return res.status(400).json({ error: "Missing keyword" });
+
+      console.log(`[MissCard] Searching for: ${keyword}`);
+
+      // Dynamic import to avoid circular deps
+        const { searchMissingCard } = await import('./src/lib/snkrdunkSearchService.ts');
+      const result = await searchMissingCard(keyword);
+
+      if (result.found) {
+        // Build notification message
+        let message = `🔍 *Miss Card Alert*\n\n`;
+        message += `*Search:* ${keyword}\n`;
+        if (result.card_name) message += `*Card:* ${result.card_name}\n`;
+        if (result.card_number) message += `*Number:* ${result.card_number}\n`;
+        if (result.set_code) message += `*Set:* ${result.set_code}\n`;
+        message += `\n`;
+        if (result.snkrdunk_url) message += `• SNKRDUNK: ${result.snkrdunk_url}\n`;
+        if (result.pokeca_url) message += `• PokecaChart: ${result.pokeca_url}\n`;
+        message += `\n_Source: ${result.source}_`;
+
+        // Send Telegram notification if ADMIN_CHAT_ID is set
+        const adminChatId = process.env.ADMIN_CHAT_ID;
+        const botToken = process.env.TELEGRAM_BOT_TOKEN;
+
+        if (adminChatId && botToken) {
+          try {
+            await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              chat_id: adminChatId,
+              text: message,
+              parse_mode: 'Markdown',
+            });
+            console.log(`[MissCard] Notification sent to admin ${adminChatId}`);
+          } catch (notifyErr: any) {
+            console.warn('[MissCard] Failed to send Telegram notification:', notifyErr.message);
+          }
+        }
+
+        res.json({ success: true, found: true, data: result, notified: !!adminChatId });
+      } else {
+        res.json({ success: true, found: false, error: result.error });
+      }
+    } catch (error: any) {
+      console.error("[MissCard] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Start Unified Telegram Bot
   try {
     const { startBot } = await import('./src/bot.ts');

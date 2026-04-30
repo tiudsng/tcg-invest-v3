@@ -16,6 +16,7 @@ export const Search = () => {
   const [listingResults, setListingResults] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [missSearching, setMissSearching] = useState(false);
 
   const handleSearch = useCallback(async (queryStr: string) => {
     if (!queryStr.trim()) return;
@@ -52,6 +53,22 @@ export const Search = () => {
             (p.card_number && p.card_number.toLowerCase().includes(queryStr.toLowerCase()))
           );
         setProductResults(filteredProducts);
+
+        // Trigger miss card notification if still no results
+        if (filteredProducts.length === 0) {
+          setMissSearching(true);
+          try {
+            await fetch('/api/report-missing-card', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ keyword: queryStr }),
+            });
+          } catch (e) {
+            console.warn('[Search] Miss card report failed:', e);
+          } finally {
+            setMissSearching(false);
+          }
+        }
       } else {
         setProductResults(fetchedProducts);
       }
@@ -158,7 +175,11 @@ export const Search = () => {
                 </div>
               ) : hasSearched && (
                 <div className="py-12 bg-gray-50 dark:bg-white/5 rounded-3xl text-center">
-                  <p className="text-gray-400 font-bold">目錄中找不到相關卡片</p>
+                  {missSearching ? (
+                    <p className="text-blue-500 font-bold">正在搜尋外部資料庫...</p>
+                  ) : (
+                    <p className="text-gray-400 font-bold">目錄中找不到相關卡片，已通知管理員</p>
+                  )}
                 </div>
               )}
             </section>
