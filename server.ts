@@ -375,12 +375,17 @@ async function startServer() {
     }
   });
 
-  // Start Unified Telegram Bot
-  try {
-    const { startBot } = await import('./src/bot.ts');
-    startBot().catch(err => console.error("Async Bot Error:", err));
-  } catch (err) {
-    console.error("Failed to start Telegraf bot:", err);
+  // Start Unified Telegram Bot (ONLY in development, NOT in serverless/production)
+  // In Vercel serverless, we use sendAdminNotification() directly instead of polling
+  if (process.env.NODE_ENV !== "production" && process.env.ENABLE_TELEGRAM_BOT === "true") {
+    try {
+      const { startBot } = await import('./src/bot.ts');
+      startBot().catch(err => console.error("Async Bot Error:", err));
+    } catch (err) {
+      console.error("Failed to start Telegraf bot:", err);
+    }
+  } else if (process.env.NODE_ENV === "production") {
+    console.log('[Server] Telegram bot polling disabled in production (serverless)');
   }
 
   // Vite middleware for development
