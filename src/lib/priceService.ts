@@ -1,9 +1,11 @@
-import { doc, setDoc, addDoc, collection, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, setDoc, addDoc, collection, serverTimestamp, increment } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export interface PriceRecord {
   psa10_price?: number;
   raw_price?: number;
+  psa10_population?: number;
+  psa_pop_total?: number;
   source?: 'bot' | 'scraper' | 'manual';
 }
 
@@ -20,11 +22,13 @@ export async function updateProductPrice(productId: string, record: PriceRecord,
   const market_data: any = { last_updated: now };
   if (record.psa10_price !== undefined) market_data.psa10_price = record.psa10_price;
   if (record.raw_price !== undefined) market_data.raw_price = record.raw_price;
+  if (record.psa10_population !== undefined) market_data.psa10_population = record.psa10_population;
+  if (record.psa_pop_total !== undefined) market_data.psa_pop_total = record.psa_pop_total;
 
-  const productUpdate = {
+  const productUpdate: any = {
     market_data,
     updatedBy: record.source || 'system',
-    last_history_sync: now
+    last_history_sync: now,
   };
 
   const historyData = {
@@ -36,22 +40,38 @@ export async function updateProductPrice(productId: string, record: PriceRecord,
 
   try {
     // Determine if we are using Firebase Admin or Client SDK
-    if (targetDb.doc && typeof targetDb.doc === 'function') {
+    if (targetDb.doc && typeof targetDb.doc === 'function' && targetDb.collection && typeof targetDb.collection === 'function') {
       // Firebase Admin SDK
       const productRef = targetDb.doc(`products/${productId}`);
-      await productRef.set(productUpdate, { merge: true });
+      
+      // Admin SDK increment - try to find FieldValue
+      let incValue: any = 1; 
+      try {
+        const { FieldValue } = await import('firebase-admin/firestore');
+        incValue = FieldValue.increment(1);
+      } catch (e) {
+        // Fallback or skip increment if not possible easily
+      }
+      
+      await productRef.set({
+        ...productUpdate,
+        history_count: incValue
+      }, { merge: true });
       
       const historyRef = productRef.collection('price_history');
       await historyRef.add({
         ...historyData,
-        createdAt: new Date() // Admin uses JS Date or FieldValue.serverTimestamp()
+        createdAt: new Date()
       });
     } else {
       // Firebase Client SDK
       const productRef = doc(targetDb, 'products', productId);
-      await setDoc(productRef, productUpdate, { merge: true });
+      await setDoc(productRef, {
+        ...productUpdate,
+        history_count: increment(1)
+      }, { merge: true });
       
-      const historyRef = collection(productRef, 'price_history');
+      const historyRef = collection(targetDb, 'products', productId, 'price_history');
       await addDoc(historyRef, {
         ...historyData,
         createdAt: serverTimestamp()

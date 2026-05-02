@@ -32,10 +32,16 @@ export const CardSearchModal: React.FC<CardSearchModalProps> = ({ isOpen, onClos
     setError('');
     try {
       const response = await axios.get(`/api/search?keyword=${encodeURIComponent(query)}`);
-      if (response.data && response.data.cardList) {
+      if (response.data && response.data.cardList && response.data.cardList.length > 0) {
         setResults(response.data.cardList);
       } else {
         setResults([]);
+        // Trigger background search and notification for missing card
+        fetch('/api/report-missing-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyword: query.trim() })
+        }).catch(err => console.error("Missing card report error:", err));
       }
     } catch (err) {
       console.error('Error searching cards:', err);

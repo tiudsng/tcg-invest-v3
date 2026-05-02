@@ -60,8 +60,8 @@ export const Articles = () => {
   }, []);
 
   const filteredArticles = articles.filter(a => 
-    a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (a.excerpt && a.excerpt.toLowerCase().includes(searchQuery.toLowerCase()))
+    (a.title || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+    (a.excerpt || '').toLowerCase().includes((searchQuery || '').toLowerCase())
   );
 
   return (

@@ -49,7 +49,7 @@ export const ImageCarousel: React.FC<{ images: string[], title: string, id: stri
                  <img 
                     src={img} 
                     alt={`${title} - image ${i + 1}`} 
-                    className="max-w-full max-h-full object-contain drop-shadow-2xl transition-transform duration-700" 
+                    className="w-full h-full object-cover drop-shadow-2xl transition-transform duration-700 group-hover:scale-[1.05]" 
                     referrerPolicy="no-referrer"
                     loading={i === 0 ? "eager" : "lazy"}
                     onError={(e) => {

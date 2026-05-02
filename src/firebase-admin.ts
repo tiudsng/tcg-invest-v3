@@ -18,23 +18,14 @@ try {
 const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
 const projectId = firebaseConfig.projectId;
 
-// CRITICAL: Set the project ID in the environment so the underlying gRPC clients 
-// for Firestore/Auth use the correct target project instead of the host project.
-if (projectId) {
-  process.env.GOOGLE_CLOUD_PROJECT = projectId;
-  console.log(`[FirebaseAdmin] GOOGLE_CLOUD_PROJECT set to: ${projectId}`);
-}
-
-console.log(`[FirebaseAdmin] Attempting to initialize for Project: ${projectId}, Database: ${databaseId}`);
-
 if (!admin.apps.length) {
   try {
-    // Rely on environment variables (GOOGLE_APPLICATION_CREDENTIALS) 
-    // which are automatically set in this environment. 
+    // Attempt to initialize using ADC (Application Default Credentials)
+    // but specify projectId if we have it from config.
     admin.initializeApp({
       projectId: projectId
     });
-    console.log(`[FirebaseAdmin] SDK Initialized for ${projectId}`);
+    console.log(`[FirebaseAdmin] SDK Initialized. Project: ${admin.app().options.projectId || 'Auto-detected'}`);
   } catch (error) {
     console.error(`[FirebaseAdmin] Init error:`, error);
   }

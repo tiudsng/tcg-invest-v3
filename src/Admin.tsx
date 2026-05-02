@@ -22,7 +22,6 @@ import { db, storage } from './firebase';
 import { syncLeaderboard } from './lib/leaderboardService';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
-import { GoogleGenAI } from '@google/genai';
 
 export const Admin = () => {
   const { user } = useAuth();
@@ -33,9 +32,11 @@ export const Admin = () => {
     totalWants: 0,
     totalLeaderboard: 0,
     totalProducts: 0,
-    totalArticles: 0
+    totalArticles: 0,
+    totalMissingReports: 0
   });
   const [recentListings, setRecentListings] = useState<any[]>([]);
+  const [missingReports, setMissingReports] = useState<any[]>([]);
   const [showArticleModal, setShowArticleModal] = useState(false);
   const [newArticle, setNewArticle] = useState({
     title: '',
@@ -75,33 +76,37 @@ export const Admin = () => {
          }
       }
 
-      // 2. Sync all cards in PARALLEL for better performance
-      const syncPromises = rankings.map((cardId, i) => {
-        if (!cardId) return Promise.resolve();
+      // 2. Loop through and sync one by one
+      for (let i = 0; i < 10; i++) {
         const rankKey = `rank_${(i + 1).toString().padStart(2, '0')}`;
+        const cardId = rankings[i] || '';
+        
+        if (!cardId) continue;
+
         toast.loading(`正在同步 NO.${i+1}: ${cardId}...`, { id: loadingToast });
-        return fetch('/api/sync-single-card', {
+
+        const res = await fetch('/api/sync-single-card', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rankKey, cardId })
-        }).then(async res => {
-          if (!res.ok) {
-            let errMsg = `伺服器回應錯誤 (${res.status})`;
-            try {
-              const contentType = res.headers.get('content-type');
-              if (contentType && contentType.includes('application/json')) {
-                const errData = await res.json();
-                errMsg = errData.error || errMsg;
-              }
-            } catch (e) {}
-            console.warn(`Failed to sync ${rankKey}:`, errMsg);
-          }
-        }).catch(err => {
-          console.warn(`Network error syncing ${rankKey}:`, err);
         });
-      });
-      
-      await Promise.all(syncPromises);
+
+        if (!res.ok) {
+           let errMsg = '未知錯誤';
+           try {
+             const contentType = res.headers.get('content-type');
+             if (contentType && contentType.includes('application/json')) {
+               const errData = await res.json();
+               errMsg = errData.error || errMsg;
+             } else {
+               errMsg = `伺服器回應錯誤 (${res.status})`;
+             }
+           } catch (e) {
+             errMsg = `解析錯誤回應失敗 (${res.status})`;
+           }
+           console.warn(`Failed to sync ${rankKey}:`, errMsg);
+        }
+      }
       
       toast.success('排行榜數據同步完成！', { id: loadingToast });
       // Refresh stats
@@ -116,7 +121,26 @@ export const Admin = () => {
   };
 
   const handleUpdatePsaPop = async () => {
-    // ... existing ...
+    setIsUpdatingPsa(true);
+    setPsaUpdateProgress(0);
+    const loadingToast = toast.loading('正在啟動全面 PSA 人口同步...');
+    
+    try {
+      const res = await fetch('/api/update-psa-pop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!res.ok) throw new Error('API request failed');
+
+      const data = await res.json();
+      toast.success(`同步完成！更新: ${data.updated}, 失敗: ${data.failed}`, { id: loadingToast });
+    } catch (error: any) {
+      console.error('Error updating PSA pop:', error);
+      toast.error(`同步失敗: ${error.message}`, { id: loadingToast });
+    } finally {
+      setIsUpdatingPsa(false);
+    }
   };
 
   const handleStorageSync = async () => {
@@ -189,6 +213,7 @@ export const Admin = () => {
         const leaderboardSnap = await getDocs(collection(db, 'leaderboard'));
         const productsSnap = await getDocs(collection(db, 'products'));
         const articlesSnap = await getDocs(collection(db, 'articles'));
+        const reportsSnap = await getDocs(query(collection(db, 'missing_reports'), orderBy('createdAt', 'desc'), limit(10)));
 
         setStats({
           totalUsers: usersSnap.size,
@@ -196,8 +221,11 @@ export const Admin = () => {
           totalWants: wantsSnap.size,
           totalLeaderboard: leaderboardSnap.size,
           totalProducts: productsSnap.size,
-          totalArticles: articlesSnap.size
+          totalArticles: articlesSnap.size,
+          totalMissingReports: reportsSnap.size
         });
+
+        setMissingReports(reportsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
         const recentQuery = query(collection(db, 'listings'), orderBy('createdAt', 'desc'), limit(5));
         const recentSnap = await getDocs(recentQuery);
@@ -351,6 +379,19 @@ export const Admin = () => {
             >
               {isSeeding ? '更新中...' : '同步最新清單'}
             </button>
+          </div>
+
+          <div className="bg-white dark:bg-[#1c1c1e] p-6 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-sm">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-red-500/10 flex items-center justify-center text-red-600 dark:text-red-400">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">自動追蹤回報</p>
+                <p className="text-2xl font-black text-gray-900 dark:text-white">{stats.totalMissingReports}</p>
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-500 font-bold">當用戶搜尋不到卡片時，系統會自動在官網抓取潛在匹配。</p>
           </div>
 
           <div className="bg-white dark:bg-[#1c1c1e] p-6 rounded-[2rem] border-2 border-amber-500/20 dark:border-amber-500/30 shadow-lg relative overflow-hidden">
@@ -556,6 +597,67 @@ export const Admin = () => {
             </div>
           )}
         </AnimatePresence>
+
+        {/* Missing Reports Section */}
+        <div className="bg-white dark:bg-[#1c1c1e] rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-gray-100 dark:border-white/5 flex items-center justify-between bg-red-500/5">
+            <h2 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
+              <Search className="w-5 h-5 text-red-500" /> 系統自動追蹤 (Snkrdunk Potentials)
+            </h2>
+            <div className="text-xs font-bold text-gray-500">最近 10 筆</div>
+          </div>
+          <div className="divide-y divide-gray-100 dark:divide-white/5">
+            {missingReports.length === 0 ? (
+              <div className="p-12 text-center text-gray-500">暫無追蹤回報</div>
+            ) : (
+              missingReports.map((report) => (
+                <div key={report.id} className="p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="px-3 py-1 bg-gray-100 dark:bg-white/5 rounded-full text-xs font-black">
+                        關鍵字: {report.keyword}
+                      </span>
+                      <span className="text-[10px] text-gray-500">
+                        {report.createdAt?.toDate?.()?.toLocaleString() || '剛剛'}
+                      </span>
+                    </div>
+                    <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase ${
+                      report.foundCount > 0 ? 'bg-green-500/20 text-green-500' : 'bg-gray-500/20 text-gray-500'
+                    }`}>
+                      {report.foundCount > 0 ? `找到 ${report.foundCount} 個潛在項目` : '未找到匹配'}
+                    </span>
+                  </div>
+                  
+                  {report.results && report.results.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {report.results.map((item: any, idx: number) => (
+                        <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5">
+                          <img src={item.imageUrl} className="w-10 h-14 object-cover rounded-lg bg-white shadow-sm" referrerPolicy="no-referrer" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{item.name}</p>
+                            <p className="text-[10px] text-blue-500 font-mono truncate">{item.id}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <a href={item.url} target="_blank" className="text-[10px] text-gray-400 hover:text-blue-500 underline">查看官網</a>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(item.id);
+                                  toast.success('ID 已複製，快去 /leaderboard 配置！');
+                                }}
+                                className="text-[10px] bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded font-bold"
+                              >
+                                複製 ID
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
         {/* Recent Activity */}
         <div className="bg-white dark:bg-[#1c1c1e] rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-sm overflow-hidden">

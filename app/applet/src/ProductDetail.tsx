@@ -38,23 +38,7 @@ export const ProductDetail = () => {
         let docSnap = await getDoc(doc(db, 'leaderboard', id));
         
         if (docSnap.exists()) {
-          const lbData = docSnap.data();
-          cardData = lbData;
-          if (lbData.card_id) {
-            const productSnap = await getDoc(doc(db, 'products', lbData.card_id));
-            if (productSnap.exists()) {
-              const pData = productSnap.data();
-              cardData = {
-                ...pData,
-                ...lbData, // lbData overrides basic strings or rank
-                id: docSnap.id,
-                market_data: {
-                  ...(pData.market_data || {}),
-                  ...(lbData.market_data || {}) // lbData overrides pData to stay consistent with leaderboard!
-                }
-              };
-            }
-          }
+          cardData = docSnap.data();
         } else {
           docSnap = await getDoc(doc(db, 'products', id));
           if (docSnap.exists()) {
@@ -260,7 +244,7 @@ export const ProductDetail = () => {
                     <span className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-widest leading-none">PSA10 SNKRDUNK售價</span>
                   </div>
                   <span className="text-2xl sm:text-3xl font-black text-[#d4af37] tracking-tighter block mt-2 drop-shadow-sm">
-                    HK${(product.market_data?.psa10_price || product.market_data?.snkrdunk_price || product.market_data?.ebay_price || 0).toLocaleString()}
+                    HK${(product.market_data?.psa10_price || 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-gray-500">

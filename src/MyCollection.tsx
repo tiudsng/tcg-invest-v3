@@ -7,6 +7,7 @@ import { db } from './firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { getHighResImage, handleImageError, getImageClass } from './lib/imageUtils';
+import { cleanMarketData } from './lib/priceUtils';
 
 const MOCK_PRODUCTS: Record<string, any> = {
   'override_van_gogh_pikachu': {
@@ -80,10 +81,14 @@ export const MyCollection = () => {
 
     const q = query(collection(db, 'user_collections'), where('userId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as CollectedCard[];
+      const docs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          market_data: cleanMarketData(doc.id, data)
+        };
+      }) as CollectedCard[];
       // Sort client-side by addedAt if present, or fallback
       docs.sort((a, b) => {
         const timeA = a.addedAt?.toMillis ? a.addedAt.toMillis() : 0;
@@ -128,7 +133,12 @@ export const MyCollection = () => {
       if (!snap.empty) {
         snap.docs.forEach(d => {
           if (!results.some(r => r.card_number === d.data().card_number && r.name_zh === d.data().name_zh)) {
-             results.push({ id: d.id, ...d.data() });
+             const data = d.data();
+             results.push({ 
+               id: d.id, 
+               ...data,
+               market_data: cleanMarketData(d.id, data)
+             });
           }
         });
       }

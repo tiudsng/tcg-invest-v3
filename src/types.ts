@@ -43,6 +43,7 @@ export interface Product {
   name_hk?: string;
   name_jp: string;
   card_number?: string;
+  set_code?: string;
   set_name: string;
   image_url: string;
   imageUrl?: string;
@@ -57,9 +58,12 @@ export interface Product {
     snkdunk_price?: number;
     psa_pop_total?: number;
     psa_pop_10?: number;
+    psa10_population?: number;
     psa_pop_10_percent?: string;
+    last_updated?: string;
   };
   analysis_quote?: string;
+  data_source?: string;
   investment_metrics?: {
     growth_potential?: number; // 0-100
     holding_advice?: string;

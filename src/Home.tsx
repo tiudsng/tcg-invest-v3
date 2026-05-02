@@ -374,9 +374,9 @@ export const Home: React.FC = () => {
   }, [loading, loadingWants, isFetchingMore, isFetchingMoreWants, isFiltering, activeTab, hasMoreListings, hasMoreWants, fetchListings, fetchWants]);
 
   const filteredListings = React.useMemo(() => listings.filter(listing => {
-    const matchesSearch = listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (listing.englishName && listing.englishName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                         listing.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (listing.title || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+                         (listing.englishName || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+                         (listing.description || '').toLowerCase().includes((searchQuery || '').toLowerCase());
     
     const matchesCondition = filters.conditions.length === 0 || filters.conditions.includes(listing.condition);
     const matchesCardType = filters.cardTypes.length === 0 || (listing.cardType && filters.cardTypes.includes(listing.cardType));
@@ -389,8 +389,8 @@ export const Home: React.FC = () => {
   }), [listings, searchQuery, filters]);
 
   const filteredWantListings = React.useMemo(() => wantListings.filter(listing => {
-    const matchesSearch = listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (listing.englishName && listing.englishName.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesSearch = (listing.title || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+                         (listing.englishName || '').toLowerCase().includes((searchQuery || '').toLowerCase());
     
     const matchesCondition = filters.conditions.length === 0 || filters.conditions.includes(listing.condition || 'Mint');
     const matchesCardType = filters.cardTypes.length === 0 || (listing.cardType && filters.cardTypes.includes(listing.cardType));

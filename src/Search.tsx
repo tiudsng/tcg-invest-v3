@@ -5,9 +5,10 @@ import { Search as SearchIcon, ArrowRight, Loader2, Package, Tag, Clock } from '
 import { motion } from 'motion/react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Product, Listing } from './types';
-import { getHighResImage, handleImageError } from './lib/imageUtils';
+import { getHighResImage, handleImageError, getImageClass } from './lib/imageUtils';
 import { ImageCarousel } from './components/ImageCarousel';
 import { ConditionBadge } from './components/ConditionBadge';
+import { cleanMarketData } from './lib/priceUtils';
 
 export const Search = () => {
   const [searchParams] = useSearchParams();
@@ -16,62 +17,77 @@ export const Search = () => {
   const [listingResults, setListingResults] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [missSearching, setMissSearching] = useState(false);
+
+    const [isReporting, setIsReporting] = useState(false);
+  const [reportResults, setReportResults] = useState<Product[]>([]);
 
   const handleSearch = useCallback(async (queryStr: string) => {
     if (!queryStr.trim()) return;
 
     setLoading(true);
     setHasSearched(true);
+    setReportResults([]);
     
     try {
-      // 1. Search in products collection by card_number (Exact match)
-      const productQuery = query(
-        collection(db, 'products'),
-        where('card_number', '==', queryStr.trim())
-      );
-      
+      const searchTerms = queryStr.toLowerCase().split(/\s+/).filter(Boolean);
+
+      const matchesSearch = (fields: (string | undefined | null)[]) => {
+        const combined = fields.filter(Boolean).join(' ').toLowerCase();
+        if (combined.includes(queryStr.toLowerCase())) return true;
+        return searchTerms.every(term => combined.includes(term));
+      };
+
       const listingsSnap = await getDocs(collection(db, 'listings'));
       const filteredListings = listingsSnap.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as Listing))
-        .filter(l => 
-          l.title.toLowerCase().includes(queryStr.toLowerCase()) ||
-          (l.englishName && l.englishName.toLowerCase().includes(queryStr.toLowerCase())) ||
-          (l.cardNumber && l.cardNumber.toLowerCase().includes(queryStr.toLowerCase()))
-        );
+        .filter(l => matchesSearch([l.title, l.englishName, l.cardNumber, l.description, l.seriesCode]));
 
-      const productsSnap = await getDocs(productQuery);
-      const fetchedProducts = productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      const allProductsSnap = await getDocs(query(collection(db, 'products'), limit(5000)));
+      const filteredProducts = allProductsSnap.docs
+        .map(doc => {
+          const data = doc.data();
+          return { 
+            id: doc.id, 
+            ...data,
+            market_data: cleanMarketData(doc.id, data)
+          } as Product;
+        })
+        .filter(p => matchesSearch([p.name, p.name_zh, p.name_jp, p.name_hk, p.card_number, p.set_name, p.set_code]));
+      
+      setProductResults(filteredProducts);
 
-      if (fetchedProducts.length === 0) {
-        const allProductsSnap = await getDocs(query(collection(db, 'products'), limit(100)));
-        const filteredProducts = allProductsSnap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as Product))
-          .filter(p => 
-            p.name_zh.toLowerCase().includes(queryStr.toLowerCase()) ||
-            p.name_jp.toLowerCase().includes(queryStr.toLowerCase()) ||
-            (p.card_number && p.card_number.toLowerCase().includes(queryStr.toLowerCase()))
-          );
-        setProductResults(filteredProducts);
-
-        // Trigger miss card notification if still no results
-        if (filteredProducts.length === 0) {
-          setMissSearching(true);
-          try {
-            await fetch('/api/report-missing-card', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ keyword: queryStr }),
-            });
-          } catch (e) {
-            console.warn('[Search] Miss card report failed:', e);
-          } finally {
-            setMissSearching(false);
-          }
+      if (filteredProducts.length === 0) {
+          setIsReporting(true);
+          fetch('/api/report-missing-card', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keyword: queryStr.trim() })
+          }).then(res => res.json()).then(data => {
+            if (data && data.success && data.data && data.data.length > 0) {
+              // Create temporary product instances to display immediately
+              const tempProducts: Product[] = data.data.map((item: any) => {
+                const isPokeca = item.id && item.id.startsWith('pokeca_');
+                return {
+                  id: item.id,
+                  card_id: item.id,
+                  name_zh: item.name || queryStr.trim(),
+                  name_en: item.name,
+                  name_jp: item.name,
+                  image_url: item.imageUrl,
+                  card_number: isPokeca ? item.slug?.split('-').pop() : (item.name?.match(/\[.*? (.*?)\]/)?.[1] || ''),
+                  set_name: isPokeca ? 'Pokeca-Chart' : (item.name?.match(/\((.*?)\)/)?.[1] || 'External Source'),
+                  market_data: {
+                    psa10_price: null,
+                    raw_price: null,
+                    snkrdunk_price: item.price ? parseInt(item.price.replace(/[^0-9]/g, '')) : undefined
+                  }
+                };
+              });
+              setReportResults(tempProducts);
+            }
+          }).catch(err => console.error("Report error:", err))
+          .finally(() => setIsReporting(false));
         }
-      } else {
-        setProductResults(fetchedProducts);
-      }
 
       setListingResults(filteredListings);
     } catch (error) {
@@ -94,6 +110,8 @@ export const Search = () => {
     handleSearch(searchQuery);
   };
 
+  const combinedProductResults = [...productResults, ...reportResults];
+
   return (
     <div className="min-h-screen bg-white dark:bg-black pt-28 pb-32">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -113,10 +131,10 @@ export const Search = () => {
             />
             <button
               type="submit"
-              disabled={loading || !searchQuery.trim()}
+              disabled={loading || isReporting || !searchQuery.trim()}
               className="absolute inset-y-2 right-2 px-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-2xl font-black transition-all flex items-center gap-2"
             >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : '搜尋'}
+              {loading || isReporting ? <Loader2 className="w-5 h-5 animate-spin" /> : '搜尋'}
             </button>
           </form>
         </div>
@@ -130,27 +148,29 @@ export const Search = () => {
           <div className="space-y-16">
             {/* Products from Catalog */}
             <section>
-              <div className="flex items-center gap-3 mb-8">
-                <div className="p-2 bg-blue-100 dark:bg-blue-500/10 rounded-xl text-blue-600">
-                  <Package className="w-6 h-6" />
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-500/10 rounded-xl text-blue-600">
+                    <Package className="w-6 h-6" />
+                  </div>
+                  <h2 className="text-2xl font-black text-gray-900 dark:text-white">官方目錄結果 ({combinedProductResults.length})</h2>
                 </div>
-                <h2 className="text-2xl font-black text-gray-900 dark:text-white">官方目錄結果 ({productResults.length})</h2>
               </div>
 
-              {productResults.length > 0 ? (
+              {combinedProductResults.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                  {productResults.map((product) => (
+                  {combinedProductResults.map((product) => (
                     <motion.div
                       key={product.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="bg-white dark:bg-[#111] rounded-[2rem] overflow-hidden border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-xl transition-all group"
                     >
-                      <Link to={`/product/${product.card_id || product.id}`} className="block relative aspect-[3/4] p-3 overflow-hidden">
+                      <Link to={`/product/${product.card_id || product.id}`} className="block relative aspect-[63/88] p-0 overflow-hidden">
                         <img 
                           src={getHighResImage(product.image_url, product.name_zh, `${product.set_name}|${product.card_number}`, product.id) || `https://placehold.co/600x840/111/d4af37?text=${encodeURIComponent(product.name_zh || '')}`} 
                           alt={product.name_zh}
-                          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                          className={`${getImageClass(getHighResImage(product.image_url, product.name_zh, `${product.set_name}|${product.card_number}`, product.id))} scale-[1.02] active:scale-[1.05]`}
                           referrerPolicy="no-referrer"
                           onError={(e) => handleImageError(e, product.image_url, product.name_zh, `${product.set_name}|${product.card_number}`)}
                         />
@@ -175,11 +195,7 @@ export const Search = () => {
                 </div>
               ) : hasSearched && (
                 <div className="py-12 bg-gray-50 dark:bg-white/5 rounded-3xl text-center">
-                  {missSearching ? (
-                    <p className="text-blue-500 font-bold">正在搜尋外部資料庫...</p>
-                  ) : (
-                    <p className="text-gray-400 font-bold">目錄中找不到相關卡片，已通知管理員</p>
-                  )}
+                  <p className="text-gray-400 font-bold">目錄中找不到相關卡片</p>
                 </div>
               )}
             </section>

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import { X, Image as ImageIcon, Settings, Check, ChevronDown, Loader2, Camera, FolderUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI } from '@google/genai';
 import { toast } from 'sonner';
 import { compressImage, compressBase64 } from './lib/imageUtils';
 

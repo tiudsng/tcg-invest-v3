@@ -50,19 +50,38 @@ export async function compressBase64(base64Str: string): Promise<string> {
 
 /**
  * Determines the CSS classes for a card image based on its source.
- * Specifically handles the zoom-hack for Snkrdunk thumbnails.
+ * Specifically handles the zoom-hack for Snkrdunk thumbnails to fill the container.
  */
 export function getImageClass(url?: string): string {
-  const baseClass = "w-full h-full object-contain transition-transform duration-500 group-hover:scale-105";
+  const baseClass = "w-full h-full object-cover transition-transform duration-500 group-hover:scale-102";
   if (!url) return baseClass;
   
-  // If the URL is explicitly a Snkrdunk thumbnail, we apply the digital zoom hack
-  // to make the circular/shoe-formatted thumbnail look like a full card.
-  if (url.includes('snkrdunk_') && !url.includes('pokellector') && !url.includes('pokemon-card.com') && !url.includes('limitless')) {
-    return `${baseClass} scale-[1.75] md:scale-[1.85]`;
+  // 1. Zoom Hack for Snkrdunk Thumbnails (usually square/round with lots of empty space)
+  // We apply object-cover and a significant scale to "zoom in" on the actual card.
+  if (url.includes('snkrdunk.com') && !url.includes('upload_bg_removed')) {
+    return "w-full h-full object-cover scale-[1.75] md:scale-[1.85] transition-transform duration-500";
   }
-  
-  // High-res sources should never be scaled/zoomed as they are full card art
+
+  // 2. Handling TCGPlayer "fit-in" square images which often have padding
+  if (url.includes('tcgplayer.com') && url.includes('fit-in')) {
+    // These are often square-boxed vertical cards. object-cover will crop the horizontal padding.
+    return "w-full h-full object-cover transition-transform duration-500 hover:scale-[1.05]";
+  }
+
+  // 3. High-res sources from storage or official sites should remain object-contain to show full borders
+  if (url.includes('firebasestorage.app') || 
+      url.includes('storage.googleapis.com') ||
+      url.includes('pokemontcg.io') ||
+      url.includes('limitlesstcg') || 
+      url.includes('_jp.jpg') ||
+      url.includes('pokellector') || 
+      url.includes('pokeca-chart.com') ||
+      url.includes('pokemon-card.com') ||
+      url.includes('storage.googleapis.com') ||
+      url.includes('upload_bg_removed')) {
+    return "w-full h-auto md:h-full object-contain transition-transform duration-500 hover:scale-[1.02]";
+  }
+
   return baseClass;
 }
 
@@ -73,31 +92,20 @@ export function getImageClass(url?: string): string {
 export function getHighResImage(url?: string, cardName?: string, setAndNumber?: string, cardId?: string): string {
   if (!url && !cardName && !cardId) return '';
 
-  // 1. If we ALREADY have a high-resolution URL (from Pokellector, Limitless, or Japanese Official site), return it!
-  // This is what the user wants: "Read ID then image" (matching IDs in products collection)
-  if (url && (
-    url.includes('pokemontcg.io') || 
-    url.includes('limitlesstcg') || 
-    url.includes('pokemon-card.com') ||
-    (url.includes('pokellector') && !url.includes('.thumb.'))
-  )) {
-    return url;
-  }
-
-  // 2. Specific High-Res Overrides (Prioritize manual high-quality mappings for top cards)
   const name = (cardName || '').toLowerCase();
   const idStr = (setAndNumber || '').toLowerCase();
 
-  // Moonbreon (Umbreon VMAX Alt Art - S6a 095/069) - pokemontcg.io English set "swsh7"
+  // 1. Specific High-Res Overrides (Prioritize manual high-quality mappings for top cards)
+
+  // Moonbreon (Umbreon VMAX Alt Art - S6a 095/069)
   if (
-    (name.includes('umbreon') && name.includes('vmax')) ||
-    (name.includes('伊布') && name.includes('vmax')) ||
-    (name.includes('ブラッキー') && name.includes('vmax')) ||
+    ((name.includes('umbreon') || name.includes('月亮伊布') || name.includes('ブラッキー') || name.includes('月光')) && name.includes('vmax')) || 
     name.includes('moonbreon') ||
-    name.includes('月亮伊布') ||
-    (idStr.includes('s6a') && (idStr.includes('95') || idStr.includes('095')))
+    (idStr.includes('s6a') && (idStr.includes('95') || idStr.includes('095'))) ||
+    (cardId && (cardId.includes('93021') || cardId.includes('rank_02')))
   ) {
-    return 'https://images.pokemontcg.io/swsh7/215_hires.png';
+    // Priority: Use the custom high-res JPG uploaded for the Japanese version
+    return `https://storage.googleapis.com/gen-lang-client-0326385388.firebasestorage.app/products/snkrdunk_93021_jp.jpg?v=2`;
   }
 
   // Mew ex (SV2a 205/165)
@@ -116,33 +124,65 @@ export function getHighResImage(url?: string, cardName?: string, setAndNumber?: 
   }
 
   // Mega Charizard X ex (SV9 110/080 SAR - Supercharged Breaker)
-  if ((idStr.includes('sv9') && idStr.includes('110')) || (name.includes('噴火龍') && name.includes('x') && idStr.includes('sv9'))) {
-    return 'https://www.pokellector.com/Japanese-Supercharged-Breaker-Expansion-Set/Charizard-ex-Card-110.png';
+  const isCharizardX = 
+    (cardId && cardId.includes('704401')) || 
+    (idStr.includes('sv9') && idStr.includes('110')) || 
+    (name.includes('噴火龍') && name.includes('x')) ||
+    (name.includes('charizard') && name.includes('x') && idStr.includes('sv9'));
+
+  if (isCharizardX) {
+    return 'https://pokeca-chart.com/wp-content/uploads/2025/09/048516_P_MRIZADONXEX-733x1024.jpg';
   }
 
   // Armored Mewtwo (Official Japanese Site 36987 / Promo 365)
-  if ((idStr.includes('sm-p') || idStr.includes('smp')) && (idStr.includes('365') || idStr.includes('36987')) || name.includes('武裝') || name.includes('裝甲') || name.includes('アーマード')) {
+  if ((idStr.includes('sm-p') || idStr.includes('smp')) && (idStr.includes('365') || idStr.includes('36987')) || name.includes('武裝') || name.includes('裝甲') || name.includes('装甲') || name.includes('アーマード')) {
     return 'https://www.pokemon-card.com/assets/images/card_images/large/SMP/036987_P_AMADOMYUUTSU.jpg';
   }
 
   // Mew ex SAR (SV4a 347/190)
-  if ((idStr.includes('sv4a') && idStr.includes('347')) || (name.includes('夢幻') && idStr.includes('sv4a'))) {
+  if ((idStr.includes('sv4a') && idStr.includes('347')) || 
+      (idStr.includes('347/190')) || 
+      (name.includes('mew') && (idStr.includes('347') || idStr.includes('sv4a')))) {
     return 'https://www.pokellector.com/Japanese-Shiny-Treasure-ex-Expansion-Set/Mew-ex-Card-347.png';
   }
 
-  // Lillie SAR (SV5a 191/170)
-  if ((idStr.includes('sv9') && idStr.includes('111')) || (idStr.includes('sv5a') && idStr.includes('191')) || (name.includes('莉莉艾') && (name.includes('sar') || name.includes('sr')))) {
-    return 'https://www.pokellector.com/Japanese-Battle-Boost-Expansion-Set/Lillie-Card-119.png';
+  // Lillie SAR (SV9 111/080)
+  if ((idStr.includes('sv9') && idStr.includes('111')) || (name.includes('莉莉艾') && name.includes('sar'))) {
+    return 'https://product-images.tcgplayer.com/fit-in/437x437/575307.jpg';
   }
 
-  // Mega Gengar ex SAR (SV9 109/080)
-  if ((idStr.includes('sv9') && idStr.includes('109')) || (name.includes('耿鬼') && (idStr.includes('sv9') || name.includes('m2a')))) {
-    return 'https://www.pokellector.com/Japanese-Supercharged-Breaker-Expansion-Set/Gengar-ex-Card-109.png';
+  // Mega Gengar ex SAR (SV9 109/080 / Pokeca Chart M2a 240/193)
+  const isMegaGengar = 
+    (cardId && (cardId.includes('724996') || cardId.includes('575305'))) || 
+    (idStr.includes('sv9') && idStr.includes('109')) || 
+    (idStr.includes('m2a') && idStr.includes('240')) ||
+    (idStr.includes('240/193')) ||
+    (name.includes('耿鬼') && (name.includes('mega') || idStr.includes('109') || idStr.includes('240')));
+
+  if (isMegaGengar) {
+    return 'https://pokeca-chart.com/wp-content/uploads/2025/11/050000_P_MGENGAEX-733x1024.jpg';
   }
 
   // Charizard ex SAR (151 - SV2a 201/165)
-  if ((idStr.includes('sv2a') && idStr.includes('201')) || (name.includes('噴火龍') && name.includes('sar') && idStr.includes('sv2a')) || idStr.includes('43986')) {
+  if ((idStr.includes('sv2a') && idStr.includes('201')) || 
+      (idStr.includes('201/165')) ||
+      (name.includes('噴火龍') && name.includes('sar') && idStr.includes('sv2a')) || 
+      idStr.includes('43986')) {
     return 'https://www.pokemon-card.com/assets/images/card_images/large/SV2a/043986_P_RIZADONEX.jpg';
+  }
+
+  // 2. If we ALREADY have a high-resolution URL (from Pokellector, Limitless, or Japanese Official site), return it!
+  // This is what the user wants: "Read ID then image" (matching IDs in products collection)
+  // We ALSO include our Firebase Storage/Google Cloud Storage URLs as they are high-res full images.
+  if (url && (
+    url.includes('pokemontcg.io') || 
+    url.includes('limitlesstcg') || 
+    url.includes('pokemon-card.com') ||
+    url.includes('firebasestorage.app') ||
+    url.includes('storage.googleapis.com') ||
+    (url.includes('pokellector') && !url.includes('.thumb.'))
+  )) {
+    return url;
   }
 
   // 3. Fallback to Snkrdunk ID mapping if URL is missing or low-res
@@ -167,16 +207,21 @@ export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event
   const target = e.currentTarget;
   const currentSrc = target.src;
   
-  // 1. If we tried Firebase Storage and it 404s, fall back to the limitlesstcg/official URL
-  if (currentSrc.includes('firebasestorage.app')) {
+  const updateSrc = (newSrc: string) => {
+    target.src = newSrc;
+    target.className = getImageClass(newSrc);
+  };
+  
+  // 1. If we tried Firebase Storage or GCS and it 404s, fall back to the limitlesstcg/official URL
+  if (currentSrc.includes('firebasestorage.app') || currentSrc.includes('storage.googleapis.com')) {
      const overrideUrl = getHighResImage(originalUrl, name, setAndNumber); // Call without cardId to get standard manual mappings
-     if (overrideUrl && overrideUrl !== currentSrc && !overrideUrl.includes('firebasestorage.app')) {
-       target.src = overrideUrl;
+     if (overrideUrl && overrideUrl !== currentSrc && !overrideUrl.includes('firebasestorage.app') && !overrideUrl.includes('storage.googleapis.com')) {
+       updateSrc(overrideUrl);
        return;
      }
 
      if (originalUrl && originalUrl !== currentSrc && !originalUrl.includes('firebasestorage.app')) {
-       target.src = originalUrl;
+       updateSrc(originalUrl);
        return;
      }
   }
@@ -184,7 +229,7 @@ export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event
   // 2. If we tried pokemontcg.io and it fails, try a different stable set or placeholder
   if (currentSrc.includes('pokemontcg.io')) {
     if (currentSrc.includes('swsh7/215')) {
-      target.src = 'https://images.pokemontcg.io/swp/215_hires.png'; // Example alternative
+      updateSrc('https://images.pokemontcg.io/swp/215_hires.png'); // Example alternative
       return;
     }
   }
@@ -192,27 +237,28 @@ export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event
   // 3. Specific high-value card fallbacks
   if (name?.includes('伊布') || name?.includes('Umbreon') || name?.includes('ブラッキー') || name?.includes('月亮')) {
     if (currentSrc !== 'https://images.pokemontcg.io/swsh7/215_hires.png') {
-      target.src = 'https://images.pokemontcg.io/swsh7/215_hires.png';
+      updateSrc('https://images.pokemontcg.io/swsh7/215_hires.png');
       return;
     }
   }
 
   if (name?.includes('梵谷') || name?.includes('Van Gogh')) {
     if (currentSrc !== 'https://images.pokemontcg.io/svp/85_hires.png') {
-      target.src = 'https://images.pokemontcg.io/svp/85_hires.png';
+      updateSrc('https://images.pokemontcg.io/svp/85_hires.png');
       return;
     }
   }
 
   // 4. If we tried high-res override but it failed, try the original URL if available
   if (originalUrl && currentSrc !== originalUrl && !originalUrl.includes('firebasestorage.app')) {
-    target.src = originalUrl;
+    updateSrc(originalUrl);
     return;
   }
 
-  // 5. Final fallback: Placeholder
-  if (!target.src.includes('placehold.co')) {
-    const placeholderName = name ? encodeURIComponent(name) : 'Card';
-    target.src = `https://placehold.co/600x840/1a1a1a/222222?text=${placeholderName}`;
+  // 5. Final fallback: Placeholder (Pokemon Card Back)
+  if (!target.src.includes('cardback')) {
+    // Use a clearer "image coming soon" or placeholder if available, 
+    // but a neutral card back is better than showing the wrong card.
+    updateSrc('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png');
   }
 }
