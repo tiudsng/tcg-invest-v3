@@ -67,6 +67,11 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    match /pokeca_gold/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin() || (request.resource.data.updatedBy == 'bot' || request.resource.data.postedBy == 'bot');
+    }
+
     match /listings/{listingId} {
       allow read: if true;
       allow create: if isAuthenticated() && isValidListing(request.resource.data);
