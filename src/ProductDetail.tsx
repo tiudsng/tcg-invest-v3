@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
-import { Product } from './types';
-import { db } from './firebase';
-import { 
-  ArrowLeft, TrendingUp, ExternalLink, LineChart, Activity, ShoppingBag, 
-  AlertCircle, BarChart3, ShieldCheck, Zap, Info, Maximize2, X, Share2, Heart 
-} from 'lucide-react';
+import { AlertCircle, ExternalLink, Maximize2, X, Share2, RefreshCw, Zap, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { getHighResImage, handleImageError, getImageClass } from './lib/imageUtils';
-import { FavoriteButton } from './components/FavoriteButton';
-import { cleanMarketData } from './lib/priceUtils';
-import { PriceTrend } from './components/PriceTrend';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
+import { CardReader } from './lib/services/cardReader';
+import { PokecaGoldCard, getSnkrdunkImageUrl } from './types/card';
+
+/**
+ * ProductDetail - Card Detail Page
+ * 
+ * Dark Theme Bento Grid Layout
+ * Data Source: CardReader (pokeca_gold collection + pokeca-chart API)
+ */
 
 const SnkrdunkLogo = ({ className = "" }: { className?: string }) => (
   <div className={`rounded-[4px] bg-gradient-to-br from-[#8C133E] via-[#35154E] to-[#070F35] flex flex-col items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] shrink-0 transition-all ${className}`}>
@@ -20,80 +21,148 @@ const SnkrdunkLogo = ({ className = "" }: { className?: string }) => (
   </div>
 );
 
+// Loading skeleton
+const LoadingSkeleton = () => (
+  <div className="min-h-screen bg-[#000000] pt-28 px-6">
+    <div className="max-w-6xl mx-auto animate-pulse">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="md:col-span-3 md:row-span-4 bg-[#1c1c1e] rounded-[2rem] h-[600px]" />
+        <div className="md:col-span-2 bg-[#1c1c1e] rounded-[2rem] h-[180px]" />
+        <div className="md:col-span-2 bg-[#1c1c1e] rounded-[2rem] h-[180px]" />
+        <div className="bg-[#1c1c1e] rounded-[2rem] h-[180px]" />
+        <div className="bg-[#1c1c1e] rounded-[2rem] h-[180px]" />
+      </div>
+    </div>
+  </div>
+);
+
+// Bento card component
+const BentoCard = ({ 
+  children, 
+  className = '', 
+  hover = true 
+}: { 
+  children: React.ReactNode; 
+  className?: string; 
+  hover?: boolean;
+}) => (
+  <div className={`
+    bg-[#1c1c1e] rounded-[2rem] p-6 
+    border border-white/5 
+    ${hover ? 'hover:border-white/20 hover:shadow-lg hover:shadow-black/20' : ''}
+    transition-all duration-300
+    ${className}
+  `}>
+    {children}
+  </div>
+);
+
+// Large stat display
+const StatBlock = ({ 
+  label, 
+  value, 
+  subtext, 
+  valueColor = 'text-white',
+  className = ''
+}: {
+  label: string;
+  value: string | number;
+  subtext?: string;
+  valueColor?: string;
+  className?: string;
+}) => (
+  <div className={className}>
+    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none">{label}</span>
+    <span className={`text-3xl font-black tracking-tighter block mt-2 ${valueColor}`}>
+      {typeof value === 'number' ? value.toLocaleString() : value}
+    </span>
+    {subtext && <span className="text-[11px] text-gray-500 mt-1 block">{subtext}</span>}
+  </div>
+);
+
 export const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   
-  const [product, setProduct] = useState<Product | null>(null);
+  const [card, setCard] = useState<PokecaGoldCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isZoomed, setIsZoomed] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Fetch card data using CardReader
   useEffect(() => {
-    const fetchProduct = async () => {
+    const fetchCard = async () => {
       if (!id) return;
 
       try {
-        let cardData: any = null;
-        let docSnap = await getDoc(doc(db, 'leaderboard', id));
+        // Try pokeca_gold first (SNKRDUNK ID as doc ID)
+        const result = await CardReader.getCardWithFreshness(id);
         
-        if (docSnap.exists()) {
-          const lbData = docSnap.data();
-          cardData = lbData;
-          if (lbData.card_id) {
-            const productSnap = await getDoc(doc(db, 'products', lbData.card_id));
-            if (productSnap.exists()) {
-              const pData = productSnap.data();
-              cardData = {
-                ...pData,
-                ...lbData, // lbData overrides basic strings or rank
-                id: docSnap.id,
-                market_data: {
-                  ...(pData.market_data || {}),
-                  ...(lbData.market_data || {}) // lbData overrides pData to stay consistent with leaderboard!
-                }
-              };
-            }
+        if (result) {
+          setCard(result.card);
+          // If data was stale, trigger refresh indicator
+          if (result.isStale) {
+            setIsRefreshing(true);
+            setTimeout(() => setIsRefreshing(false), 3000);
           }
         } else {
-          docSnap = await getDoc(doc(db, 'products', id));
-          if (docSnap.exists()) {
-            cardData = docSnap.data();
+          // Fallback: try leaderboard collection (for rank_XX doc IDs)
+          const leaderboardSnap = await getDoc(doc(db, 'leaderboard', id));
+          if (leaderboardSnap.exists()) {
+            const data = leaderboardSnap.data();
+            // Build a PokecaGoldCard-compatible object from leaderboard data
+            const fallbackCard: PokecaGoldCard = {
+              id: id,
+              snkrdunk_id: data.snkrdunk_id || id,
+              name_jp: data.name_jp || data.name_zh || 'Unknown',
+              name_en: data.name_en || '',
+              name_zh: data.name_zh || data.name_jp || '',
+              card_number: data.card_number || '',
+              set_code: data.set_code || '',
+              set_name: data.set_name || '',
+              image_url: data.image_url || '',
+              market_data: data.market_data || {},
+              psa_data: data.psa_data || {},
+              updatedAt: data.updatedAt,
+            };
+            setCard(fallbackCard);
+          } else {
+            setError('找不到此卡片資料');
           }
-        }
-        
-        if (cardData) {
-          const cleanedMarketData = cleanMarketData(docSnap.id, cardData);
-          
-          setProduct({
-            id: docSnap.id,
-            ...cardData,
-            card_id: cardData.card_id || docSnap.id,
-            market_data: cleanedMarketData
-          } as Product);
-        } else {
-          setError('找不到此卡片資料');
         }
       } catch (err) {
-        console.error("Error fetching product:", err);
+        console.error("Error fetching card:", err);
         setError('載入失敗，請稍後再試');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProduct();
+    fetchCard();
   }, [id]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen pt-20 flex items-center justify-center bg-[#0a0a0a]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#d4af37]"></div>
-      </div>
-    );
-  }
+  // Manual refresh
+  const handleRefresh = async () => {
+    if (!id) return;
+    setIsRefreshing(true);
+    try {
+      // If card came from leaderboard fallback, it may not have slug for CardReader
+      if (card?.snkrdunk_id && card?.slug) {
+        await CardReader.triggerDataRefresh(id);
+        const result = await CardReader.getCard(id);
+        if (result) setCard(result);
+      }
+    } catch (err) {
+      console.error("Refresh failed:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
-  if (error || !product) {
+  if (loading) return <LoadingSkeleton />;
+
+  if (error || !card) {
     return (
       <div className="min-h-screen pt-20 flex flex-col items-center justify-center px-4 text-center bg-[#0a0a0a]">
         <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
@@ -108,316 +177,207 @@ export const ProductDetail = () => {
     );
   }
 
-  const changeStr = String(product.market_data.change_24h || '');
-  const isPos = changeStr.startsWith('+');
-  const isNeg = changeStr.startsWith('-');
-  const changeColor = isPos ? 'text-[#30d158]' : isNeg ? 'text-[#ff453a]' : 'text-gray-400';
-  const changeDisplay = changeStr.replace('+', '↗').replace('-', '↘') || '-';
-
-  const investmentGrade = product.rank && product.rank <= 3 ? 'S' : product.rank && product.rank <= 10 ? 'A' : 'B';
-  const volatility = isPos && parseFloat(product.market_data.change_24h) > 10 ? '高' : '中';
-  const liquidity = product.rank && product.rank <= 10 ? '極高' : '高';
-  
-  const priceA = product.market_data.psa10_price || 0;
-  const priceB = product.market_data.ebay_price || 0;
-  const arbSpace = Math.abs(priceA - priceB);
-  const arbPercent = priceA > 0 ? ((arbSpace / Math.min(priceA, priceB)) * 100).toFixed(1) : '0';
-
-  const pokecaUrl = product.pokeca_url || (product.data_source?.includes('pokeca-chart') ? product.data_source : null);
-  const snkrdunkId = product.id?.startsWith('snkrdunk_') ? product.id.replace('snkrdunk_', '') : null;
-  const snkrdunkUrl = snkrdunkId ? `https://snkrdunk.com/apparels/${snkrdunkId}` : null;
-  
-  const displaySourceUrl = pokecaUrl || snkrdunkUrl || product.data_source;
-  const displaySourceName = displaySourceUrl?.includes('pokeca-chart') ? 'POKECA-CHART' : displaySourceUrl?.includes('snkrdunk') ? 'SNKRDUNK' : 'OFFICIAL';
-
-  const getProductImage = () => {
-    return getHighResImage(
-      product.image_url || product.imageUrl || (product as any).imageURL,
-      product.name_zh || product.name_jp,
-      `${product.set_name}|${product.card_number}`,
-      product.id || product.card_id
-    ) || `https://placehold.co/600x840/111/d4af37?text=${encodeURIComponent(product.name_zh || 'Loading')}`;
-  };
+  // Derive values
+  const imageUrl = card.image_url || getSnkrdunkImageUrl(card.id);
+  const psa10 = card.psa_data?.psa10 || 0;
+  const psaAll = card.psa_data?.psa_all || 0;
+  const psa10Pct = card.psa_data?.psa10_pct || 0;
+  const priceJpy = card.market_data?.psa10_latest_jpy || card.market_data?.psa10_median || 0;
+  const priceHkd = card.market_data?.psa10_price || 0;
+  const rawPriceHkd = card.market_data?.raw_price || card.market_data?.raw_hkd_lowest || 0;
 
   return (
     <div className="min-h-screen bg-[#000000] text-white pb-32">
       <div className="max-w-6xl mx-auto pt-28 sm:pt-36 md:pt-44 md:px-12">
-        <div className="bg-[#111] md:rounded-[3rem] shadow-2xl border border-white/5 overflow-hidden flex flex-col md:flex-row">
+        
+        {/* Header Row */}
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                {card.set_code?.toUpperCase()} · #{card.card_number}
+              </span>
+              {card.slug && (
+                <a 
+                  href={`https://pokeca-chart.com/${card.slug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 text-[9px] font-bold text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  pokeca-chart
+                </a>
+              )}
+            </div>
+            <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tighter uppercase leading-[0.9]">
+              {card.name_jp}
+            </h1>
+            {card.name_en && card.name_en !== card.name_jp && (
+              <p className="text-sm text-gray-400 mt-1">{card.name_en}</p>
+            )}
+          </div>
           
-          {/* Image Section */}
+          {/* Refresh indicator */}
+          <AnimatePresence>
+            {isRefreshing && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 border border-blue-500/30 rounded-full"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-blue-400 animate-spin" />
+                <span className="text-[10px] font-bold text-blue-400">更新中</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Bento Grid Layout */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 auto-rows-[180px]">
+          
+          {/* 1. Hero Image (2 cols x 4 rows) */}
           <div 
-            className="w-full md:w-[45%] aspect-[63/88] md:aspect-auto md:h-[700px] flex items-center justify-center bg-black/40 relative overflow-hidden cursor-zoom-in group/img"
+            className="col-span-2 md:col-span-3 row-span-4 bg-black/40 rounded-[2rem] overflow-hidden relative group cursor-zoom-in"
             onClick={() => setIsZoomed(true)}
           >
             <img 
-              src={getProductImage()} 
-              alt={product.name_zh} 
-              className={`${getImageClass(getProductImage())} w-full h-full md:h-full object-contain`}
+              src={imageUrl}
+              alt={card.name_jp}
+              className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-[1.02]"
               referrerPolicy="no-referrer"
-              onError={(e) => handleImageError(e, product.image_url || product.imageUrl || (product as any).imageURL, product.name_zh, `${product.set_name}|${product.card_number}`)}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = getSnkrdunkImageUrl(card.id);
+              }}
             />
             
-            <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover/img:opacity-100 hidden md:flex">
-               <div className="w-16 h-16 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/20">
-                 <Maximize2 className="w-8 h-8 text-white" />
-               </div>
-            </div>
-
-            <button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                if (navigator.share) {
-                  navigator.share({ title: product.name_zh, url: window.location.href });
-                } else {
-                  navigator.clipboard.writeText(window.location.href);
-                }
-              }}
-              className="absolute top-4 left-4 z-10 w-9 h-9 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/10 active:scale-90 transition-all cursor-pointer md:hidden"
-            >
-              <Share2 className="w-4 h-4 opacity-90" />
-            </button>
-
-            <div className="absolute top-4 right-4 z-10 md:hidden">
-              <div className="w-9 h-9 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all cursor-pointer">
-                <FavoriteButton listingId={product.id} className="scale-100 !text-white opacity-90 !bg-transparent" />
+            {/* Zoom hint overlay */}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all hidden md:flex items-center justify-center">
+              <div className="w-14 h-14 bg-white/10 backdrop-blur-xl rounded-full items-center justify-center border border-white/20 opacity-0 group-hover:opacity-100 transition-all flex">
+                <Maximize2 className="w-6 h-6 text-white" />
               </div>
             </div>
 
+            {/* Mobile zoom button */}
             <button 
               onClick={(e) => { e.stopPropagation(); setIsZoomed(true); }}
-              className="absolute bottom-4 right-4 z-10 w-8 h-8 bg-black/50 backdrop-blur-md rounded-full flex mx-auto items-center justify-center text-white border border-white/10 active:scale-90 transition-all md:hidden"
+              className="absolute bottom-4 right-4 z-10 w-9 h-9 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 md:hidden"
             >
-              <Maximize2 className="w-4 h-4 opacity-90" />
+              <Maximize2 className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Details Section */}
-          <div className="w-full md:w-[55%] p-5 sm:p-8 md:p-12 flex flex-col">
-            <div className="mb-8">
-              <div className="flex flex-nowrap items-center gap-1.5 sm:gap-3 mb-6 overflow-x-auto pb-2 scrollbar-none">
-                <div className="px-2 sm:px-3 py-1 bg-gradient-to-r from-amber-500 to-yellow-600 rounded-full flex items-center gap-1 sm:gap-1.5 shadow-lg shadow-amber-500/20 whitespace-nowrap shrink-0">
-                  <Zap className="w-2.5 h-2.5 sm:w-3 h-3 text-white fill-white" />
-                  <span className="text-[8px] sm:text-[10px] font-black text-white italic tracking-tighter uppercase">LEVEL {investmentGrade} ASSET</span>
-                </div>
-                
-                <div className="px-2 sm:px-3 py-1 bg-white/5 border border-white/10 rounded-full flex items-center gap-1 sm:gap-2 whitespace-nowrap shrink-0">
-                  <Activity className="w-2.5 h-2.5 sm:w-3 h-3 text-blue-400" />
-                  <span className="text-[8px] sm:text-[10px] font-black text-blue-400 uppercase tracking-widest leading-none">{liquidity} 流通性</span>
-                </div>
-                
-                <div className="px-2 sm:px-3 py-1 bg-white/5 border border-white/10 rounded-full flex items-center gap-1 sm:gap-2 whitespace-nowrap shrink-0">
-                  <LineChart className="w-2.5 h-2.5 sm:w-3 h-3 text-purple-400" />
-                  <span className="text-[8px] sm:text-[10px] font-black text-purple-400 uppercase tracking-widest leading-none">{volatility} 波動率</span>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-2">
-                {product.set_name && (
-                  <span className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-widest leading-none">
-                    {product.set_name} • {product.set_code || 'SV'} SERIES
-                  </span>
-                )}
-                {product.card_number && (
-                  <span className="text-[10px] sm:text-xs font-black text-gray-400 uppercase tracking-widest bg-white/10 px-1.5 py-0.5 rounded leading-none">
-                    #{product.card_number}
-                  </span>
-                )}
-              </div>
-              
-              <h1 className="text-3xl sm:text-6xl font-black text-white leading-[0.9] mb-2 tracking-tighter uppercase italic drop-shadow-sm break-words">
-                {product.name_zh || product.name || 'Loading...'}
-              </h1>
-              <p className="text-base sm:text-xl text-gray-400 font-bold tracking-tight opacity-90">{product.name_hk || product.name_jp}</p>
+          {/* 2. PSA 10 Population - HIGHLIGHT */}
+          <div className="col-span-2 md:col-span-2 row-span-1 bg-gradient-to-br from-[#d4af37]/20 to-[#d4af37]/5 border border-[#d4af37]/30 rounded-[2rem] p-5 flex flex-col justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-[#d4af37]" />
+              <span className="text-[10px] font-black text-[#d4af37] uppercase tracking-widest">PSA 10 Population</span>
             </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <div>
-                <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-tighter italic">
-                   市場數據動態 (MARKET DATA)
-                </h3>
-                <div className="flex flex-wrap items-center gap-2 mt-1">
-                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                    Last Updated: {product.market_data?.last_updated ? new Date(product.market_data.last_updated).toLocaleString() : 'Just Now'}
-                  </p>
-                  {displaySourceUrl && (
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[9px] font-black text-blue-400 group/source hover:bg-white/10 transition-colors">
-                      <ExternalLink className="w-2.5 h-2.5 opacity-70 group-hover/source:opacity-100" />
-                      <a href={displaySourceUrl} target="_blank" rel="noreferrer" className="hover:underline tracking-tight uppercase">
-                        DATA SOURCE: {displaySourceName}
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-black text-[#d4af37] tracking-tighter">
+                {psa10 > 0 ? psa10.toLocaleString() : '--'}
+              </span>
+              <span className="text-xs text-gray-400">units</span>
             </div>
-
-            {/* Advanced Investment Grid */}
-            <div className="grid grid-cols-2 gap-3 mb-8">
-              <div className="p-5 bg-[#1c1c1e]/50 backdrop-blur-xl rounded-[1.5rem] border border-white/5 flex flex-col justify-between group hover:border-[#d4af37]/30 transition-all">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <SnkrdunkLogo className="w-4 h-4 sm:w-[18px] sm:h-[18px] grayscale group-hover:grayscale-0 opacity-80 group-hover:opacity-100" />
-                    <span className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-widest leading-none">PSA10 SNKRDUNK售價</span>
-                  </div>
-                  <span className="text-2xl sm:text-3xl font-black text-[#d4af37] tracking-tighter block mt-2 drop-shadow-sm">
-                    HK${(product.market_data?.psa10_price || product.market_data?.snkrdunk_price || product.market_data?.ebay_price || 0).toLocaleString()}
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-gray-500">
-                  <ShieldCheck className="w-3.5 h-3.5 text-green-500" /> 認證資產
-                </div>
-              </div>
-              
-              <div className="p-5 bg-[#1c1c1e]/50 backdrop-blur-xl rounded-[1.5rem] border border-white/5 flex flex-col justify-between group hover:border-white/20 transition-all">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <SnkrdunkLogo className="w-4 h-4 sm:w-[18px] sm:h-[18px] grayscale group-hover:grayscale-0 opacity-80 group-hover:opacity-100" />
-                    <span className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-widest leading-none">RAW 裸卡價格</span>
-                  </div>
-                  <span className="text-2xl sm:text-3xl font-black text-white tracking-tighter block mt-2 drop-shadow-sm">
-                    HK${(product.market_data?.raw_price || 0) > 0 ? (product.market_data?.raw_price || 0).toLocaleString() : '-'}
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-gray-500">
-                  <LineChart className="w-3.5 h-3.5 text-gray-400" /> 未鑑定市價
-                </div>
-              </div>
-            </div>
-
-            {/* Market Statistics Grid (HKD Corrected) */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-8">
-              <div className="p-3 sm:p-4 bg-white/5 rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center text-center">
-                <span className="text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">平均成交價</span>
-                <span className="text-sm sm:text-lg font-black text-white tracking-tighter">
-                  HK${Math.round((product.market_data?.avg_price || 0) * 0.052).toLocaleString()}
-                </span>
-              </div>
-              <div className="p-3 sm:p-4 bg-white/5 rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center text-center">
-                <span className="text-[8px] sm:text-[10px] font-black text-green-500/70 uppercase tracking-widest mb-1.5">歷史最高價</span>
-                <span className="text-sm sm:text-lg font-black text-[#30d158] tracking-tighter">
-                  HK${Math.round((product.market_data?.max_price || 0) * 0.052).toLocaleString()}
-                </span>
-              </div>
-              <div className="p-3 sm:p-4 bg-white/5 rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center text-center">
-                <span className="text-[8px] sm:text-[10px] font-black text-red-500/70 uppercase tracking-widest mb-1.5">市場最低價</span>
-                <span className="text-sm sm:text-lg font-black text-[#ff453a] tracking-tighter">
-                  HK${Math.round((product.market_data?.min_price || 0) * 0.052).toLocaleString()}
-                </span>
-              </div>
-            </div>
-
-            {/* PSA Population Data Report */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-8">
-              <div className="p-3 sm:p-4 bg-[#1c1c1e]/50 backdrop-blur-xl rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center group hover:border-white/20 transition-all overflow-hidden text-center">
-                <span className="text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-tight sm:tracking-widest mb-1.5 whitespace-nowrap">鑑定總數</span>
-                <span className="text-base sm:text-xl font-black text-white tracking-tighter">
-                  {(() => {
-                    const val = product.market_data?.psa_pop_total || (product as any).psa_pop_total;
-                    return (val !== undefined && val !== null && Number(val) > 0) ? Number(val).toLocaleString() : '-';
-                  })()}
-                </span>
-              </div>
-              <div className="p-3 sm:p-4 bg-[#1c1c1e]/50 backdrop-blur-xl rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center group hover:border-[#d4af37]/30 transition-all border-l border-r border-white/10 overflow-hidden text-center">
-                <span className="text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-tight sm:tracking-widest mb-1.5 font-sans whitespace-nowrap">PSA 10 數量</span>
-                <span className="text-base sm:text-xl font-black text-[#d4af37] tracking-tighter">
-                  {(() => {
-                    const val = product.market_data?.psa_pop_10 || (product as any).psa_pop_10 || product.market_data?.psa10_population || (product as any).psa10_population;
-                    return (val !== undefined && val !== null && Number(val) > 0) ? Number(val).toLocaleString() : '-';
-                  })()}
-                </span>
-              </div>
-              <div className="p-3 sm:p-4 bg-[#1c1c1e]/50 backdrop-blur-xl rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center group hover:border-purple-500/30 transition-all overflow-hidden text-center">
-                <span className="text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-tight sm:tracking-widest mb-1.5 whitespace-nowrap">PSA 10 比例</span>
-                <span className="text-base sm:text-xl font-black text-purple-400 tracking-tighter">
-                  {(() => {
-                    const val = product.market_data?.psa_pop_10_percent || (product as any).psa_pop_10_percent;
-                    return (val && val !== '0%') ? val : '-';
-                  })()}
-                </span>
-              </div>
-            </div>
-
-            {/* Price Trend Chart */}
-            <div className="mb-8">
-              <PriceTrend productId={product.card_id || product.id || id || ''} />
-            </div>
-
-            {/* Investment Potential Summary */}
-            <div className="mb-8 p-6 bg-white/5 rounded-2xl border border-white/5 backdrop-blur-md">
-              <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                <BarChart3 className="w-4 h-4" /> 投資潛力分析
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1.5 uppercase">
-                    <span>增值潛力</span>
-                    <span className="text-white">{product.investment_metrics?.growth_potential ? (product.investment_metrics.growth_potential >= 80 ? '極強' : '穩健') : (product.rank && product.rank <= 5 ? '極強' : '穩健')}</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${product.investment_metrics?.growth_potential || (100 - ((product.rank || 0)) * 5)}%` }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1.5 uppercase">
-                    <span>持有建議</span>
-                    <span className="text-white">{product.investment_metrics?.holding_advice || '長期 (2-3年)'}</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#d4af37] rounded-full" style={{ width: `${product.investment_metrics?.holding_score || 85}%` }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1.5 uppercase">
-                    <span>市場流通性</span>
-                    <span className="text-white">{liquidity}</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-green-500 rounded-full" style={{ width: liquidity === '極高' ? '95%' : '80%' }} />
-                  </div>
-                </div>
-                <p className="text-[11px] text-gray-500 leading-relaxed font-bold italic mt-4 border-l-2 border-[#d4af37]/30 pl-3">
-                  {product.analysis_quote ? (
-                    `「${product.analysis_quote}」`
-                  ) : (
-                    `「${product.name_zh} 作為 ${product.set_name} 的明星卡牌，其藝術價值與稀有度確保了強大的市場深度與長期升值空間。」`
-                  )}
-                </p>
-              </div>
-            </div>
-
-            {/* Extended Details */}
-            {(product as any).description && (
-              <div className="p-6 bg-white/5 rounded-2xl border border-white/5 mb-6">
-                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">卡片描述</h4>
-                <p className="text-sm text-gray-300 leading-relaxed font-medium">{(product as any).description}</p>
-              </div>
-            )}
-            
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              {(['rarity_zh', 'type', 'illustrator', 'weakness'] as const).map((key) => {
-                const val = (product as any)[key];
-                if (!val) return null;
-                const labels: Record<string, string> = { rarity_zh: '稀有度', type: '類型', illustrator: '繪師', weakness: '弱點' };
-                return (
-                  <div key={key} className="p-4 bg-white/5 rounded-xl border border-white/5">
-                    <span className="block text-[10px] font-black text-gray-500 uppercase mb-1">{labels[key]}</span>
-                    <span className="text-sm font-bold text-gray-200">{val}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="mt-auto pt-8 border-t border-white/10">
-              <button 
-                onClick={() => navigate(`/?search=${encodeURIComponent(product.name_zh || '')}`)}
-                className="w-full bg-white hover:bg-gray-200 text-black py-4 sm:py-5 rounded-[1.25rem] sm:rounded-[1.5rem] font-black text-lg sm:text-xl flex items-center justify-center gap-2 sm:gap-3 transition-all active:scale-95 shadow-lg shadow-white/5">
-                <ShoppingBag className="w-6 h-6" />
-                在市集尋找此卡
-              </button>
+            <div className="text-[10px] text-gray-500">
+              Total graded: <span className="text-gray-300">{psaAll > 0 ? psaAll.toLocaleString() : '--'}</span>
             </div>
           </div>
+
+          {/* 3. PSA 10 Rate */}
+          <div className="col-span-1 md:col-span-1 row-span-1 bg-[#1c1c1e] border border-white/5 rounded-[2rem] p-5 flex flex-col justify-between">
+            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Gem Mint Rate</span>
+            <span className="text-3xl font-black tracking-tighter text-purple-400">
+              {psa10Pct > 0 ? `${psa10Pct}%` : '--'}
+            </span>
+            {psa10Pct > 0 && (
+              <div className="w-full bg-gray-800 rounded-full h-1 mt-2 overflow-hidden">
+                <div 
+                  className="h-full bg-purple-500 rounded-full transition-all"
+                  style={{ width: `${Math.min(psa10Pct, 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 4. Market Price JPY */}
+          <div className="col-span-1 md:col-span-1 row-span-1 bg-[#1c1c1e] border border-white/5 rounded-[2rem] p-5 flex flex-col justify-between">
+            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Market (JPY)</span>
+            <span className="text-2xl font-black tracking-tighter text-white">
+              {priceJpy > 0 ? `¥${priceJpy.toLocaleString()}` : '--'}
+            </span>
+            {card.market_data?.source && (
+              <span className="text-[9px] text-gray-500">{card.market_data.source}</span>
+            )}
+          </div>
+
+          {/* 5. PSA10 HKD Price */}
+          <div className="col-span-2 md:col-span-2 row-span-1 bg-[#1c1c1e] border border-white/5 rounded-[2rem] p-5 flex flex-col justify-between">
+            <div className="flex items-center gap-2">
+              <SnkrdunkLogo className="w-5 h-5 opacity-60" />
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">PSA10 (HKD)</span>
+            </div>
+            <span className="text-3xl font-black tracking-tighter text-[#d4af37]">
+              {priceHkd > 0 ? `HK$${priceHkd.toLocaleString()}` : '--'}
+            </span>
+          </div>
+
+          {/* 6. RAW Price */}
+          <div className="col-span-1 md:col-span-1 row-span-1 bg-[#1c1c1e] border border-white/5 rounded-[2rem] p-5 flex flex-col justify-between">
+            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">RAW (HKD)</span>
+            <span className="text-2xl font-black tracking-tighter text-white">
+              {rawPriceHkd > 0 ? `HK$${rawPriceHkd.toLocaleString()}` : '--'}
+            </span>
+          </div>
+
+          {/* 7. Set Info */}
+          <div className="col-span-2 md:col-span-5 row-span-1 bg-[#1c1c1e] border border-white/5 rounded-[2rem] p-5 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center border border-white/10">
+                <span className="text-lg font-black text-gray-400">{card.set_code?.toUpperCase().slice(0, 3)}</span>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-widest">Set Code</span>
+                <p className="text-lg font-black text-white">{card.set_code?.toUpperCase()}</p>
+              </div>
+              <div className="border-l border-white/10 h-10 mx-2" />
+              <div>
+                <span className="text-xs text-gray-500 uppercase tracking-widest">Card No.</span>
+                <p className="text-lg font-black text-white">#{card.card_number}</p>
+              </div>
+            </div>
+            
+            {/* SNKRDUNK Link */}
+            <a 
+              href={`https://snkrdunk.com/apparels/${card.snkrdunk_id || card.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors"
+            >
+              <SnkrdunkLogo className="w-4 h-4" />
+              <span className="text-[11px] font-bold text-gray-300">View on SNKRDUNK</span>
+              <ExternalLink className="w-3 h-3 text-gray-500" />
+            </a>
+          </div>
+
         </div>
+
+        {/* Manual Refresh Button */}
+        <div className="mt-8 flex justify-center">
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#1c1c1e] border border-white/10 rounded-xl text-sm font-bold text-gray-300 hover:bg-white/5 disabled:opacity-50 transition-all"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? '更新中...' : '刷新數據'}
+          </button>
+        </div>
+
+        {/* Info note */}
+        <p className="text-center text-[10px] text-gray-600 mt-4">
+          數據自動從 pokeca-chart.com 更新 · 使用 SNKRDUNK ID: {card.id}
+        </p>
       </div>
 
       {/* Image Zoom Modal */}
@@ -428,7 +388,8 @@ export const ProductDetail = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setIsZoomed(false)}
-            className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 sm:p-8 cursor-zoom-out">
+            className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 sm:p-8 cursor-zoom-out"
+          >
             <button 
               className="absolute top-8 right-8 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors z-[110]"
               onClick={() => setIsZoomed(false)}
@@ -440,8 +401,8 @@ export const ProductDetail = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              src={getProductImage()}
-              alt={product.name_zh}
+              src={imageUrl}
+              alt={card.name_jp}
               className="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
               referrerPolicy="no-referrer"
             />
