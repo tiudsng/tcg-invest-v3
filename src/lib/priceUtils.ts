@@ -45,8 +45,28 @@ export const cleanMarketData = (cardId: string, data: any) => {
   let ebayPrice = parsePriceToHkd(marketData.ebay_price_hkd || marketData.ebay_price || data.ebay_price || data.price || 0);
   
   // Specifically for PSA10 and Raw prices which might be in JPY in the raw market_data
-  const psa10Price = parsePriceToHkd(marketData.psa10_price_hkd || marketData.psa10_price || 0);
-  const rawPrice = parsePriceToHkd(marketData.raw_price_hkd || marketData.raw_price || 0);
+  // V2 schema: market_data.psa10_price_jpy, market_data.raw_price_jpy
+  const psa10Price = parsePriceToHkd(
+    marketData.psa10_price_hkd || 
+    marketData.psa10_price || // fallback to JPY if not in HKD
+    data.psa10_hkd || 
+    0
+  );
+  
+  // raw_price: V2 stores raw_price_jpy, need to convert to HKD
+  // Priority: raw_price_hkd -> raw_price (if HKD) -> raw_price_jpy (convert from JPY)
+  let rawPrice = parsePriceToHkd(marketData.raw_price_hkd || marketData.raw_price || 0);
+  if (rawPrice === 0) {
+    // Fallback to JPY and convert
+    // V2 stores raw_price_jpy as a NUMBER (580000 yen), not a currency string
+    // parsePriceToHkd only detects currency from string format, so we need explicit JPY conversion
+    const rawPriceJpy = marketData.raw_price_jpy || data.raw_price_jpy || 0;
+    if (rawPriceJpy && typeof rawPriceJpy === 'number' && rawPriceJpy > 0) {
+      rawPrice = Math.round(rawPriceJpy * 0.052); // JPY to HKD
+    } else {
+      rawPrice = parsePriceToHkd(rawPriceJpy);
+    }
+  }
   
   // Keep raw prices for secondary display if needed
   const psa10PriceJpy = marketData.psa10_price_jpy || marketData.psa10_price || 0;
@@ -65,11 +85,22 @@ export const cleanMarketData = (cardId: string, data: any) => {
     return 0;
   };
 
-  const psa10Population = parsePopCount(marketData.psa_pop_10 || marketData.psa10_population || data.psa_pop_10 || data.psa10_population);
-  const psaPopTotal = parsePopCount(marketData.psa_pop_total || data.psa_pop_total);
+  // V2 leaderboard schema: data.psa_data contains population stats
+  const psaData = data.psa_data || {};
+  const psa10Population = parsePopCount(
+    marketData.psa_pop_10 || marketData.psa10_population || 
+    data.psa_pop_10 || data.psa10_population ||
+    psaData.psa10_count || // V2 field name
+    0
+  );
+  const psaPopTotal = parsePopCount(
+    marketData.psa_pop_total || data.psa_pop_total ||
+    psaData.total_graded || // V2 field name
+    0
+  );
   
-  // Ensure we have a valid percentage string
-  let psaPop10Percent = marketData.psa_pop_10_percent || data.psa_pop_10_percent;
+  // V2 PSA ratio - prefer string ratio from V2 over computed
+  let psaPop10Percent = marketData.psa_pop_10_percent || data.psa_pop_10_percent || psaData.psa10_ratio;
   if (!psaPop10Percent && psaPopTotal > 0 && psa10Population > 0) {
     psaPop10Percent = `${((psa10Population / psaPopTotal) * 100).toFixed(1)}%`;
   }
