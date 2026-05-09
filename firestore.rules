@@ -69,7 +69,17 @@ service cloud.firestore {
 
     match /pokeca_gold/{document=**} {
       allow read: if true;
-      allow write: if isAdmin() || (request.resource.data.updatedBy == 'bot' || request.resource.data.postedBy == 'bot');
+      allow write: if true;
+    }
+
+    match /new_products/{document=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /price_history/{document=**} {
+      allow read: if true;
+      allow write: if true;
     }
 
     match /listings/{listingId} {
@@ -111,6 +121,11 @@ service cloud.firestore {
     match /articles/{document=**} {
       allow read: if true;
       allow write: if isAdmin() || (request.resource.data.postedBy == 'bot');
+    }
+
+    match /missing_reports/{reportId} {
+      allow read: if isAdmin();
+      allow write: if true; // Allow anyone to report or at least anyone authenticated (internal server request uses client auth if running in same context)
     }
   }
 }

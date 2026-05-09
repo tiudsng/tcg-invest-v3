@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
 import { Product } from './types';
-import { db } from './firebase';
 import { 
   ArrowLeft, TrendingUp, ExternalLink, LineChart, Activity, ShoppingBag, 
   AlertCircle, BarChart3, ShieldCheck, Zap, Info, Maximize2, X, Share2, Heart 
@@ -12,6 +10,7 @@ import { getHighResImage, handleImageError, getImageClass } from './lib/imageUti
 import { FavoriteButton } from './components/FavoriteButton';
 import { cleanMarketData } from './lib/priceUtils';
 import { PriceTrend } from './components/PriceTrend';
+import { CardReader } from './services/CardReader';
 
 const SnkrdunkLogo = ({ className = "" }: { className?: string }) => (
   <div className={`rounded-[4px] bg-gradient-to-br from-[#8C133E] via-[#35154E] to-[#070F35] flex flex-col items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] shrink-0 transition-all ${className}`}>
@@ -34,27 +33,14 @@ export const ProductDetail = () => {
       if (!id) return;
 
       try {
-        let cardData: any = null;
-        let docSnap = await getDoc(doc(db, 'leaderboard', id));
-        
-        if (docSnap.exists()) {
-          cardData = docSnap.data();
-        } else {
-          docSnap = await getDoc(doc(db, 'products', id));
-          if (docSnap.exists()) {
-            cardData = docSnap.data();
-          }
-        }
+        const cardData = await CardReader.getCard(id);
         
         if (cardData) {
-          const cleanedMarketData = cleanMarketData(docSnap.id, cardData);
-          
+          const cleanedMarketData = cleanMarketData(cardData.id, cardData);
           setProduct({
-            id: docSnap.id,
             ...cardData,
-            card_id: cardData.card_id || docSnap.id,
             market_data: cleanedMarketData
-          } as Product);
+          });
         } else {
           setError('找不到此卡片資料');
         }
@@ -107,7 +93,7 @@ export const ProductDetail = () => {
   const arbSpace = Math.abs(priceA - priceB);
   const arbPercent = priceA > 0 ? ((arbSpace / Math.min(priceA, priceB)) * 100).toFixed(1) : '0';
 
-  const pokecaUrl = product.pokeca_url || (product.data_source?.includes('pokeca-chart') ? product.data_source : null);
+  const pokecaUrl = (product as any).pokeca_url || (product.data_source?.includes('pokeca-chart') ? product.data_source : null);
   const snkrdunkId = product.id?.startsWith('snkrdunk_') ? product.id.replace('snkrdunk_', '') : null;
   const snkrdunkUrl = snkrdunkId ? `https://snkrdunk.com/apparels/${snkrdunkId}` : null;
   
@@ -241,10 +227,10 @@ export const ProductDetail = () => {
                 <div>
                   <div className="flex items-center gap-1.5 mb-2">
                     <SnkrdunkLogo className="w-4 h-4 sm:w-[18px] sm:h-[18px] grayscale group-hover:grayscale-0 opacity-80 group-hover:opacity-100" />
-                    <span className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-widest leading-none">PSA10 SNKRDUNK售價</span>
+                    <span className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-widest leading-none whitespace-nowrap">PSA10 平台售價</span>
                   </div>
                   <span className="text-2xl sm:text-3xl font-black text-[#d4af37] tracking-tighter block mt-2 drop-shadow-sm">
-                    HK${(product.market_data?.psa10_price || 0).toLocaleString()}
+                    HK${(product.market_data?.psa10_price || product.market_data?.snkrdunk_price || product.market_data?.ebay_price || 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center gap-2 text-[9px] sm:text-[10px] font-bold text-gray-500">
@@ -273,19 +259,19 @@ export const ProductDetail = () => {
               <div className="p-3 sm:p-4 bg-white/5 rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center text-center">
                 <span className="text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">平均成交價</span>
                 <span className="text-sm sm:text-lg font-black text-white tracking-tighter">
-                  HK${Math.round((product.market_data?.avg_price || 0) * 0.052).toLocaleString()}
+                  HK${Math.round(((product.market_data as any)?.avg_price || 0) * 0.052).toLocaleString()}
                 </span>
               </div>
               <div className="p-3 sm:p-4 bg-white/5 rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center text-center">
                 <span className="text-[8px] sm:text-[10px] font-black text-green-500/70 uppercase tracking-widest mb-1.5">歷史最高價</span>
                 <span className="text-sm sm:text-lg font-black text-[#30d158] tracking-tighter">
-                  HK${Math.round((product.market_data?.max_price || 0) * 0.052).toLocaleString()}
+                  HK${Math.round(((product.market_data as any)?.max_price || 0) * 0.052).toLocaleString()}
                 </span>
               </div>
               <div className="p-3 sm:p-4 bg-white/5 rounded-[1.5rem] border border-white/5 flex flex-col items-center justify-center text-center">
                 <span className="text-[8px] sm:text-[10px] font-black text-red-500/70 uppercase tracking-widest mb-1.5">市場最低價</span>
                 <span className="text-sm sm:text-lg font-black text-[#ff453a] tracking-tighter">
-                  HK${Math.round((product.market_data?.min_price || 0) * 0.052).toLocaleString()}
+                  HK${Math.round(((product.market_data as any)?.min_price || 0) * 0.052).toLocaleString()}
                 </span>
               </div>
             </div>
@@ -323,7 +309,7 @@ export const ProductDetail = () => {
 
             {/* Price Trend Chart */}
             <div className="mb-8">
-              <PriceTrend productId={product.card_id || product.id || id || ''} />
+              <PriceTrend productId={product.card_id || product.id || id || ''} collectionName={product.collection_name || 'products'} />
             </div>
 
             {/* Investment Potential Summary */}

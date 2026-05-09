@@ -205,6 +205,8 @@ export const MyCollection = () => {
     }, 0);
   };
 
+  const currentTotal = calculateTotalValue();
+  
   const getCardImage = (item: CollectedCard) => {
     return getHighResImage(item.image_url, item.name_zh || item.name_jp, `${item.set_name}|${item.card_number}`, item.card_id);
   };
@@ -218,12 +220,12 @@ export const MyCollection = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f2f2f7] dark:bg-[#000000] text-[#1d1d1f] dark:text-[#f5f5f7] pt-28 sm:pt-40 pb-32 px-4 sm:px-6 transition-colors duration-500">
+    <div className="min-h-screen bg-[#f2f2f7] dark:bg-[#000000] text-[#1d1d1f] dark:text-[#f5f5f7] pt-16 sm:pt-20 pb-32 px-4 sm:px-6 transition-colors duration-500">
       <div className="max-w-4xl mx-auto space-y-8">
         
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 px-2">
-          <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 px-2 mb-2">
+          <div className="space-y-3 flex-1">
             <motion.button 
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
@@ -233,105 +235,180 @@ export const MyCollection = () => {
               <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
               <span>返回上一頁</span>
             </motion.button>
-            <motion.h1 
+            <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-3xl sm:text-4xl font-black tracking-tight"
+              className="flex flex-col gap-1"
             >
-              我的收藏
-            </motion.h1>
-            <motion.p 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="text-base text-gray-500 dark:text-gray-400 font-medium tracking-tight"
-            >
-              紀錄與追蹤您的珍貴卡牌
-            </motion.p>
+              <h1 className="text-sm sm:text-base text-gray-500 dark:text-gray-400 font-bold tracking-tight uppercase">
+                總價值
+              </h1>
+              <div className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tighter text-[#d4af37] flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-bold">HK$</span>
+                {calculateTotalValue().toLocaleString()}
+              </div>
+            </motion.div>
           </div>
           
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-            className="hidden sm:block"
-          >
-            <Star className="w-12 h-12 text-amber-500 fill-amber-500" />
-          </motion.div>
+          {collections.length > 0 && currentTotal > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="w-full sm:w-48 h-20 shrink-0 opacity-80"
+            >
+              <svg width="100%" height="100%" viewBox="0 0 200 80" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#d4af37" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#d4af37" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <path 
+                  d="M0,80 L0,50 C30,30 60,60 100,40 C140,20 170,30 200,10 L200,80 Z" 
+                  fill="url(#colorPrice)" 
+                />
+                <path 
+                  d="M0,50 C30,30 60,60 100,40 C140,20 170,30 200,10" 
+                  fill="none" 
+                  stroke="#d4af37" 
+                  strokeWidth="3" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                />
+              </svg>
+            </motion.div>
+          )}
         </div>
 
-        {/* Stats Summary - Apple Bento Cards */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-6">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white dark:bg-[#1c1c1e] rounded-3xl p-5 border border-gray-100 dark:border-white/[0.05] shadow-[0_4px_24px_rgba(0,0,0,0.04)] flex flex-col justify-between"
-          >
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 opacity-80">收藏總數</p>
-              <p className="text-3xl font-black tracking-tighter tabular-nums text-gray-900 dark:text-white">
-                {collections.length} <span className="text-sm text-gray-300 dark:text-gray-600 font-bold">張</span>
-              </p>
+        {/* Collection Grid */}
+        <div className="space-y-6 px-1">
+          <div className="flex items-center justify-between px-2">
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-gray-900 dark:text-white">我的珍藏展示櫃</h2>
+            <div className="px-3 py-1 bg-gray-200 dark:bg-white/10 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
+              {collections.length} ITEMS
             </div>
-            <div className="mt-4 flex items-center gap-1.5 text-green-500 font-bold text-[9px] bg-green-500/10 self-start px-2 py-1 rounded-full uppercase tracking-wider">
-              <TrendingUp className="w-3 h-3" />
-              <span>追蹤中</span>
+          </div>
+          
+          {loading ? (
+            <div className="py-24 flex flex-col items-center justify-center gap-4">
+              <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-gray-400 font-bold tracking-widest text-xs uppercase animate-pulse">讀取收藏中...</p>
             </div>
-          </motion.div>
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-white dark:bg-[#1c1c1e] rounded-3xl p-5 border border-gray-100 dark:border-white/[0.05] shadow-[0_4px_24px_rgba(0,0,0,0.04)] flex flex-col justify-between"
-          >
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 opacity-80 font-sans flex items-center gap-1.5">
-                <TrendingUp className="w-3 h-3 text-[#d4af37]" /> 估算價值
-              </p>
-              <p className="text-2xl sm:text-3xl font-black tracking-tighter text-[#d4af37] flex items-baseline gap-0.5 tabular-nums">
-                <span className="text-sm">$</span>
-                {calculateTotalValue().toLocaleString()}
-              </p>
+          ) : collections.length === 0 ? (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="bg-white/50 dark:bg-[#111]/50 backdrop-blur-sm rounded-[3rem] p-12 sm:p-20 text-center border-2 border-dashed border-gray-200 dark:border-white/5"
+            >
+              <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gray-100 dark:bg-black rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                <Star className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 dark:text-gray-700" />
+              </div>
+              <p className="font-black text-gray-900 dark:text-white text-xl sm:text-2xl mb-2 tracking-tight">您的展示櫃空空如也</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-8">趕快搜尋喜愛的卡牌並加入追蹤清單吧！</p>
+              <button 
+                onClick={() => document.querySelector('input')?.focus()}
+                className="px-8 py-3 bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-200 text-white dark:text-black rounded-2xl font-black text-sm active:scale-95 transition-all shadow-lg"
+              >
+                立即搜尋
+              </button>
+            </motion.div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+              <AnimatePresence mode="popLayout">
+                {collections.map((item, index) => (
+                  <motion.div 
+                    key={item.id} 
+                    layout
+                    initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ delay: index * 0.05, type: "spring", damping: 20 }}
+                    className="bg-white dark:bg-[#111] rounded-[2rem] border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden flex flex-col group relative transition-all hover:shadow-xl dark:hover:shadow-white/5"
+                  >
+                    <div 
+                      className="absolute top-4 right-4 z-20 p-2.5 bg-red-500/90 hover:bg-red-500 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-all cursor-pointer backdrop-blur-md shadow-lg shadow-red-500/20 active:scale-90"
+                      onClick={() => handleRemoveCollection(item.id, item.name_zh)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </div>
+                    
+                    <div 
+                      className="aspect-[3/4] bg-gray-50 dark:bg-black p-4 flex items-center justify-center cursor-pointer overflow-hidden border-b border-gray-100 dark:border-white/5"
+                      onClick={() => navigate(`/product/${item.card_id}`)}
+                    >
+                      <img 
+                        src={getCardImage(item)} 
+                        alt={item.name_zh}
+                        className={`max-w-full max-h-full transition-transform duration-700 group-hover:scale-110 drop-shadow-2xl ${getImageClass(getCardImage(item))}`}
+                        referrerPolicy="no-referrer"
+                        onError={(e) => handleImageError(e, item.image_url, item.name_zh)}
+                      />
+                    </div>
+                    
+                    <div 
+                      className="p-5 flex-1 flex flex-col cursor-pointer bg-white dark:bg-[#111]"
+                      onClick={() => navigate(`/product/${item.card_id}`)}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[10px] font-black bg-gray-100 dark:bg-white/10 px-2.5 py-0.5 rounded text-gray-600 dark:text-gray-300 tracking-tighter">
+                          {item.card_number}
+                        </span>
+                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest truncate">{item.set_name}</span>
+                      </div>
+                      
+                      <h3 className="font-black text-sm sm:text-base leading-tight text-gray-900 dark:text-white mb-3 line-clamp-2 truncate tracking-tight">{item.name_zh}</h3>
+                      
+                      <div className="mt-auto pt-4 border-t border-gray-100 dark:border-white/10 flex items-end justify-between">
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-0.5">目前市值</p>
+                          <p className="font-black text-lg sm:text-xl text-blue-600 dark:text-blue-400 tracking-tighter tabular-nums">
+                            HK$ {(item.market_data?.snkrdunk_price || item.market_data?.ebay_price || 0).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-gray-50 dark:bg-white/5 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
+                          <Plus className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
-            <div className="mt-4 flex items-center gap-1 text-gray-400 font-bold text-[9px] uppercase tracking-widest opacity-60">
-              <span>HKD</span>
-            </div>
-          </motion.div>
+          )}
         </div>
-
-        {/* Search / Add Module - Elevated Glassy Input */}
+        
+        {/* Search / Add Module */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-white dark:bg-[#1c1c1e] rounded-3xl p-6 sm:p-8 border border-gray-100 dark:border-white/[0.05] shadow-[0_4px_24px_rgba(0,0,0,0.04)]"
+          className="bg-white dark:bg-[#111] rounded-[2rem] p-5 sm:p-7 border border-gray-200 dark:border-white/10 shadow-sm mx-1"
         >
-          <div className="flex items-center gap-2 mb-6">
-            <div className="w-8 h-8 bg-blue-600 dark:bg-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Plus className="w-5 h-5 text-white" />
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-8 h-8 bg-blue-600 dark:bg-blue-500 rounded-full flex items-center justify-center shadow-md">
+              <Plus className="w-4 h-4 text-white" />
             </div>
-            <h2 className="text-xl font-black tracking-tight text-gray-900 dark:text-white">新增至我的收藏</h2>
+            <h2 className="text-lg sm:text-xl font-black tracking-tight text-gray-900 dark:text-white">新增卡牌至收藏</h2>
           </div>
 
-          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 relative">
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-grow group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
               <input 
                 type="text" 
                 value={searchCode}
                 onChange={(e) => setSearchCode(e.target.value)}
-                placeholder="輸入卡號搜尋 (例: 201/165)"
-                className="w-full bg-gray-50 dark:bg-black/40 border-2 border-transparent focus:border-blue-500/30 rounded-xl py-3.5 pl-11 pr-4 text-base font-bold focus:ring-0 outline-none transition-all placeholder:text-gray-400 dark:text-white shadow-inner"
+                placeholder="輸入卡號 (例: 201/165)"
+                className="w-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-white/10 focus:border-blue-500 dark:focus:border-blue-500 rounded-xl py-3.5 pl-11 pr-4 text-sm font-bold focus:ring-1 focus:ring-blue-500/50 outline-none transition-all placeholder:text-gray-400 dark:text-gray-300 shadow-inner"
               />
             </div>
             <button 
               type="submit" 
               disabled={isSearching}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3.5 rounded-xl font-black text-base disabled:bg-gray-200 dark:disabled:bg-gray-800 transition-all active:scale-95 shadow-lg shadow-blue-600/10 flex items-center justify-center min-w-[120px]"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3.5 rounded-xl font-black text-sm disabled:bg-gray-200 dark:disabled:bg-gray-800 transition-all active:scale-95 flex items-center justify-center min-w-[120px]"
             >
-              {isSearching ? <RefreshCw className="w-5 h-5 animate-spin" /> : '追蹤其卡牌'}
+              {isSearching ? <RefreshCw className="w-4 h-4 animate-spin" /> : '搜尋卡牌'}
             </button>
           </form>
 
@@ -369,103 +446,6 @@ export const MyCollection = () => {
           </AnimatePresence>
         </motion.div>
 
-        {/* Collection Grid */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between px-3">
-            <h2 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">我的珍藏展示櫃</h2>
-            <div className="px-4 py-1.5 bg-gray-200 dark:bg-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
-              {collections.length} ITEMS
-            </div>
-          </div>
-          
-          {loading ? (
-            <div className="py-24 flex flex-col items-center justify-center gap-4">
-              <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-gray-400 font-bold tracking-widest text-xs uppercase animate-pulse">讀取收藏中...</p>
-            </div>
-          ) : collections.length === 0 ? (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="bg-white dark:bg-[#1c1c1e] rounded-[3rem] p-20 text-center border-2 border-dashed border-gray-100 dark:border-white/5"
-            >
-              <div className="w-24 h-24 bg-gray-50 dark:bg-[#111] rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
-                <Star className="w-12 h-12 text-gray-200 dark:text-gray-700" />
-              </div>
-              <p className="font-black text-gray-900 dark:text-white text-2xl mb-2 tracking-tight">您的展示櫃空空如也</p>
-              <p className="text-gray-400 font-medium mb-8">趕快搜尋喜愛的卡牌並加入追蹤清單吧！</p>
-              <button 
-                onClick={() => document.querySelector('input')?.focus()}
-                className="px-8 py-3 bg-gray-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-sm active:scale-95 transition-all"
-              >
-                立即搜尋
-              </button>
-            </motion.div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-5 sm:gap-8">
-              <AnimatePresence mode="popLayout">
-                {collections.map((item, index) => (
-                  <motion.div 
-                    key={item.id} 
-                    layout
-                    initial={{ opacity: 0, scale: 0.9, y: 30 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ delay: index * 0.05, type: "spring", damping: 20 }}
-                    className="bg-white dark:bg-[#1c1c1e] rounded-3xl border border-gray-100 dark:border-white/[0.05] shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col group relative transition-all hover:shadow-[0_20px_64px_rgba(0,0,0,0.08)]"
-                  >
-                    <div 
-                      className="absolute top-4 right-4 z-20 p-2.5 bg-red-500 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-all cursor-pointer backdrop-blur-xl shadow-xl shadow-red-500/20 active:scale-90"
-                      onClick={() => handleRemoveCollection(item.id, item.name_zh)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </div>
-                    
-                    <div 
-                      className="aspect-[3/4] bg-gray-50 dark:bg-black p-4 flex items-center justify-center cursor-pointer overflow-hidden"
-                      onClick={() => navigate(`/product/${item.card_id}`)}
-                    >
-                      <img 
-                        src={getCardImage(item)} 
-                        alt={item.name_zh}
-                        className={`max-w-full max-h-full transition-transform duration-700 group-hover:scale-110 drop-shadow-2xl ${getImageClass(getCardImage(item))}`}
-                        referrerPolicy="no-referrer"
-                        onError={(e) => handleImageError(e, item.image_url, item.name_zh)}
-                      />
-                    </div>
-                    
-                    <div 
-                      className="p-5 flex-1 flex flex-col cursor-pointer bg-white dark:bg-[#1c1c1e]"
-                      onClick={() => navigate(`/product/${item.card_id}`)}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-[10px] font-black bg-gray-100 dark:bg-white/5 px-2 py-0.5 rounded text-gray-500 dark:text-gray-400 tracking-tighter">
-                          {item.card_number}
-                        </span>
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest truncate">{item.set_name}</span>
-                      </div>
-                      
-                      <h3 className="font-black text-base sm:text-lg leading-tight text-gray-900 dark:text-white mb-3 line-clamp-2 truncate tracking-tight">{item.name_zh}</h3>
-                      
-                      <div className="mt-auto pt-4 border-t border-gray-50 dark:border-white/5 flex items-end justify-between">
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-0.5">目前市值</p>
-                          <p className="font-black text-xl text-blue-600 dark:text-blue-400 tracking-tighter tabular-nums">
-                            HK$ {(item.market_data?.snkrdunk_price || item.market_data?.ebay_price || 0).toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="w-8 h-8 rounded-full border border-gray-100 dark:border-white/10 flex items-center justify-center group-hover:bg-blue-600 group-hover:border-blue-600 transition-all">
-                          <Plus className="w-4 h-4 text-gray-300 group-hover:text-white group-hover:rotate-90 transition-all" />
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          )}
-        </div>
-        
       </div>
     </div>
   );

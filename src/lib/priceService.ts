@@ -12,7 +12,7 @@ export interface PriceRecord {
 /**
  * Updates a product's current price and records it in the history subcollection.
  */
-export async function updateProductPrice(productId: string, record: PriceRecord, dbOverride?: any) {
+export async function updateProductPrice(productId: string, record: PriceRecord, dbOverride?: any, targetCollection: string = 'products') {
   if (!productId) return;
 
   const targetDb = dbOverride || db;
@@ -42,7 +42,7 @@ export async function updateProductPrice(productId: string, record: PriceRecord,
     // Determine if we are using Firebase Admin or Client SDK
     if (targetDb.doc && typeof targetDb.doc === 'function' && targetDb.collection && typeof targetDb.collection === 'function') {
       // Firebase Admin SDK
-      const productRef = targetDb.doc(`products/${productId}`);
+      const productRef = targetDb.doc(`${targetCollection}/${productId}`);
       
       // Admin SDK increment - try to find FieldValue
       let incValue: any = 1; 
@@ -65,13 +65,13 @@ export async function updateProductPrice(productId: string, record: PriceRecord,
       });
     } else {
       // Firebase Client SDK
-      const productRef = doc(targetDb, 'products', productId);
+      const productRef = doc(targetDb, targetCollection, productId);
       await setDoc(productRef, {
         ...productUpdate,
         history_count: increment(1)
       }, { merge: true });
       
-      const historyRef = collection(targetDb, 'products', productId, 'price_history');
+      const historyRef = collection(targetDb, targetCollection, productId, 'price_history');
       await addDoc(historyRef, {
         ...historyData,
         createdAt: serverTimestamp()

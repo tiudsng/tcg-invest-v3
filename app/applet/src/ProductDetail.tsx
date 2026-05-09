@@ -12,6 +12,7 @@ import { getHighResImage, handleImageError, getImageClass } from './lib/imageUti
 import { FavoriteButton } from './components/FavoriteButton';
 import { cleanMarketData } from './lib/priceUtils';
 import { PriceTrend } from './components/PriceTrend';
+import { CardReader } from './services/CardReader';
 
 const SnkrdunkLogo = ({ className = "" }: { className?: string }) => (
   <div className={`rounded-[4px] bg-gradient-to-br from-[#8C133E] via-[#35154E] to-[#070F35] flex flex-col items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] shrink-0 transition-all ${className}`}>
@@ -34,25 +35,12 @@ export const ProductDetail = () => {
       if (!id) return;
 
       try {
-        let cardData: any = null;
-        let docSnap = await getDoc(doc(db, 'leaderboard', id));
-        
-        if (docSnap.exists()) {
-          cardData = docSnap.data();
-        } else {
-          docSnap = await getDoc(doc(db, 'products', id));
-          if (docSnap.exists()) {
-            cardData = docSnap.data();
-          }
-        }
+        const cardData = await CardReader.getCard(id);
         
         if (cardData) {
-          const cleanedMarketData = cleanMarketData(docSnap.id, cardData);
-          
+          const cleanedMarketData = cleanMarketData(cardData.id, cardData);
           setProduct({
-            id: docSnap.id,
             ...cardData,
-            card_id: cardData.card_id || docSnap.id,
             market_data: cleanedMarketData
           } as Product);
         } else {

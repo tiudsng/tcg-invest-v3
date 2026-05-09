@@ -102,7 +102,7 @@ export function getHighResImage(url?: string, cardName?: string, setAndNumber?: 
     ((name.includes('umbreon') || name.includes('月亮伊布') || name.includes('ブラッキー') || name.includes('月光')) && name.includes('vmax')) || 
     name.includes('moonbreon') ||
     (idStr.includes('s6a') && (idStr.includes('95') || idStr.includes('095'))) ||
-    (cardId && (cardId.includes('93021') || cardId.includes('rank_02')))
+    (cardId && (cardId.includes('93021')))
   ) {
     // Priority: Use the custom high-res JPG uploaded for the Japanese version
     return `https://storage.googleapis.com/gen-lang-client-0326385388.firebasestorage.app/products/snkrdunk_93021_jp.jpg?v=2`;
@@ -125,7 +125,7 @@ export function getHighResImage(url?: string, cardName?: string, setAndNumber?: 
 
   // Mega Charizard X ex (SV9 110/080 SAR - Supercharged Breaker)
   const isCharizardX = 
-    (cardId && cardId.includes('704401')) || 
+    (cardId && (cardId.includes('704401') || cardId.includes('110_080') || cardId.includes('11^080') )) || 
     (idStr.includes('sv9') && idStr.includes('110')) || 
     (name.includes('噴火龍') && name.includes('x')) ||
     (name.includes('charizard') && name.includes('x') && idStr.includes('sv9'));
@@ -135,7 +135,7 @@ export function getHighResImage(url?: string, cardName?: string, setAndNumber?: 
   }
 
   // Armored Mewtwo (Official Japanese Site 36987 / Promo 365)
-  if ((idStr.includes('sm-p') || idStr.includes('smp')) && (idStr.includes('365') || idStr.includes('36987')) || name.includes('武裝') || name.includes('裝甲') || name.includes('装甲') || name.includes('アーマード')) {
+  if ((idStr.includes('sm-p') || idStr.includes('smp')) && (idStr.includes('365') || idStr.includes('36987')) || name.includes('盔甲') || name.includes('武裝') || name.includes('裝甲') || name.includes('装甲') || name.includes('アーマード')) {
     return 'https://www.pokemon-card.com/assets/images/card_images/large/SMP/036987_P_AMADOMYUUTSU.jpg';
   }
 

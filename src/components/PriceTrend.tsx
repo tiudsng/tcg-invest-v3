@@ -1,22 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  AreaChart,
-  Area
-} from 'recharts';
 import { format } from 'date-fns';
 import { TrendingUp, Activity } from 'lucide-react';
 
 interface PriceTrendProps {
   productId: string;
+  collectionName?: string;
 }
 
 interface HistoryItem {
@@ -26,7 +16,7 @@ interface HistoryItem {
   timestamp: any;
 }
 
-export const PriceTrend: React.FC<PriceTrendProps> = ({ productId }) => {
+export const PriceTrend: React.FC<PriceTrendProps> = ({ productId, collectionName = 'products' }) => {
   const [data, setData] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +24,7 @@ export const PriceTrend: React.FC<PriceTrendProps> = ({ productId }) => {
     const fetchHistory = async () => {
       if (!productId) return;
       try {
-        const historyRef = collection(db, 'products', productId, 'price_history');
+        const historyRef = collection(db, collectionName, productId, 'price_history');
         const q = query(historyRef, orderBy('createdAt', 'asc'), limit(50));
         const snapshot = await getDocs(q);
         
@@ -49,9 +39,6 @@ export const PriceTrend: React.FC<PriceTrendProps> = ({ productId }) => {
           };
         });
 
-        // Filter out records without prices and deduplicate by day for cleaner chart
-        const uniqueData = historyData.filter(item => item.psa10 || item.raw);
-        
         setData(uniqueData);
       } catch (err) {
         console.error("Error fetching price history:", err);

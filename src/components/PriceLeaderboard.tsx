@@ -251,7 +251,7 @@ export const PriceLeaderboard = () => {
         {/* NO.1 Card */}
         {topCards[0] && (
           <div 
-            onClick={() => navigate(`/product/${topCards[0].snkrdunk_id || topCards[0].card_id || topCards[0].id}`)}
+            onClick={() => navigate(`/product/${topCards[0].id || topCards[0].card_id}`)}
             className="col-span-2 lg:col-span-1 relative rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden border border-[#d4af37]/60 bg-black flex flex-col shadow-[0_0_20px_rgba(212,175,55,0.15)] cursor-pointer hover:scale-[1.01] transition-transform duration-300"
           >
             {/* Image Section - Matches exact card aspect ratio (63/88) so the whole card fits */}
@@ -283,33 +283,22 @@ export const PriceLeaderboard = () => {
                 </div>
               )}
               
-              <div className="flex flex-col gap-1 mb-4">
-                <div className="flex items-end gap-3 pt-2">
+              <div className="flex flex-col gap-2 mb-2 mt-2">
+                {/* Primary Stat: Price & Change */}
+                <div className="flex justify-between items-end">
                   <div className="flex flex-col">
-                    <span className="text-[9px] sm:text-[10px] font-bold text-[#d4af37] uppercase tracking-wider mb-0.5">PSA10 snkrdunk 售價</span>
-                    <span className="text-[#d4af37] text-2xl sm:text-4xl font-black tracking-tighter leading-none">
-                      <AnimatedPrice price={topCards[0].market_data?.psa10_price || topCards[0].market_data?.snkrdunk_price || topCards[0].market_data?.ebay_price || 0} />
+                    <span className="text-[10px] sm:text-xs font-bold text-[#d4af37] uppercase tracking-widest mb-1 whitespace-nowrap">PSA10 平台售價</span>
+                    <span className="text-[#d4af37] text-3xl sm:text-5xl font-black tracking-tighter leading-none flex items-baseline gap-1">
+                      <span className="text-xl sm:text-2xl font-bold">HK$</span>
+                      <AnimatedPrice price={topCards[0].market_data?.psa10_price || topCards[0].market_data?.snkrdunk_price || topCards[0].market_data?.ebay_price || 0} prefix="" />
                     </span>
                   </div>
-                  <div className="flex flex-col border-l border-white/10 pl-3">
-                    <span className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">PSA10 人口</span>
-                    <span className="text-white text-xl sm:text-2xl font-black tracking-tighter leading-none">
-                      {(() => {
-                        const val = topCards[0].market_data?.psa_pop_10 || topCards[0].market_data?.psa10_population;
-                        return (val !== undefined && val !== null && Number(val) > 0) ? Number(val).toLocaleString() : '-';
-                      })()}
-                    </span>
-                  </div>
-                  <div className="flex flex-col border-l border-white/10 pl-3">
-                    <span className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">數據數 (筆)</span>
-                    <span className="text-white text-xl sm:text-2xl font-black tracking-tighter leading-none">
-                      {(topCards[0] as any).history_count || 24}
-                    </span>
-                  </div>
-                  <div className="pb-1">
+                  <div className="flex flex-col items-end pb-1">
                     {renderChange(topCards[0].market_data?.change_24h, true)}
                   </div>
                 </div>
+
+                {/* Secondary Stats */}
               </div>
             </div>
           </div>
@@ -319,7 +308,7 @@ export const PriceLeaderboard = () => {
         {topCards.slice(1, 3).map((card, idx) => (
           <div 
             key={card.id || card.card_id} 
-            onClick={() => navigate(`/product/${card.snkrdunk_id || card.card_id || card.id}`)}
+            onClick={() => navigate(`/product/${card.id || card.card_id}`)}
             className="col-span-1 relative rounded-3xl overflow-hidden border border-white/5 bg-black flex flex-col shadow-xl cursor-pointer hover:scale-[1.02] transition-transform duration-300"
           >
             {/* Image Section - Matches exact card aspect ratio */}
@@ -341,11 +330,20 @@ export const PriceLeaderboard = () => {
             <div className="px-3 pb-4 pt-0 relative z-10 bg-black flex flex-col flex-grow">
               <h4 className="text-white text-xs sm:text-sm font-bold truncate mb-0.5">{card.name_zh}</h4>
               {card.name_hk && <p className="text-[#d4af37] text-[10px] font-bold truncate mb-1 opacity-80">{card.name_hk}</p>}
-              <div className="flex flex-col gap-0.5 mt-auto">
-                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-tight">PSA10 snkrdunk 售價</span>
-                <span className="text-gray-300 text-sm font-bold tracking-tight">HK$ {(card.market_data?.psa10_price || card.market_data?.snkrdunk_price || 0).toLocaleString()}</span>
-                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-tight mt-1">數據數: {(card as any).history_count || 18} 筆</span>
-                <span className="text-xs font-bold">{renderChange(card.market_data?.change_24h)}</span>
+              <div className="flex flex-col mt-auto">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight whitespace-nowrap mb-0.5">PSA10 平台售價</span>
+                {(() => {
+                  const priceStr = (card.market_data?.psa10_price || card.market_data?.snkrdunk_price || 0).toLocaleString();
+                  const isLongPrice = priceStr.length >= 6;
+                  return (
+                    <span 
+                      className={`text-white font-black tracking-tighter leading-none mb-1.5 mt-0.5 whitespace-nowrap ${isLongPrice ? 'text-[16px] sm:text-[18px] lg:text-[20px]' : 'text-[20px] sm:text-[22px]'}`}
+                    >
+                      HK$ {priceStr}
+                    </span>
+                  );
+                })()}
+                <div className="text-sm font-bold">{renderChange(card.market_data?.change_24h)}</div>
               </div>
             </div>
           </div>
@@ -380,7 +378,7 @@ export const PriceLeaderboard = () => {
                     {remainingCards.map((card) => (
                       <div 
                         key={card.id || card.card_id} 
-                        onClick={() => navigate(`/product/${card.snkrdunk_id || card.card_id || card.id}`)}
+                        onClick={() => navigate(`/product/${card.id || card.card_id}`)}
                         className="bg-gray-50 dark:bg-[#1c1c1e] rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#222] transition-colors border border-gray-100 dark:border-transparent"
                       >
                         <div className="w-8 text-gray-400 font-bold text-sm text-center tracking-tighter">
@@ -401,15 +399,9 @@ export const PriceLeaderboard = () => {
                           <h4 className="text-gray-900 dark:text-white text-xs font-bold truncate">{card.name_zh}</h4>
                           {card.name_hk && <p className="text-[#d4af37] text-[10px] font-bold truncate opacity-80 leading-none mb-0.5">{card.name_hk}</p>}
                           <div className="text-[10px] flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-                            <span className="text-gray-500 dark:text-gray-400 font-bold">PSA10 snkrdunk 售價</span>
+                            <span className="text-gray-500 dark:text-gray-400 font-bold">PSA10 平台售價</span>
                             <span className="text-gray-500 dark:text-gray-400 font-medium">HK$ {(card.market_data?.psa10_price || card.market_data?.snkrdunk_price || 0).toLocaleString()}</span>
                             <span className="text-gray-400">·</span>
-                            <span className="text-gray-500 dark:text-gray-400 font-bold">POP: {(() => {
-                              const val = card.market_data?.psa_pop_10 || card.market_data?.psa10_population;
-                              return (val !== undefined && val !== null && Number(val) > 0) ? Number(val).toLocaleString() : '-';
-                            })()}</span>
-                            <span className="text-gray-400">·</span>
-                            <span className="text-gray-500 dark:text-gray-400 font-bold">數據數: <span className="text-white">{(card as any).history_count || (Math.floor(Math.random() * 10) + 15)}</span> 筆</span>
                             {renderChange(card.market_data?.change_24h)}
                           </div>
                         </div>

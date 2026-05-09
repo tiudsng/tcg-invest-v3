@@ -64,6 +64,7 @@ export interface Product {
   };
   analysis_quote?: string;
   data_source?: string;
+  collection_name?: string;
   investment_metrics?: {
     growth_potential?: number; // 0-100
     holding_advice?: string;

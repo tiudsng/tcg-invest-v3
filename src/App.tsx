@@ -17,6 +17,7 @@ import { AIScan } from './AIScan';
 import { Admin } from './Admin';
 import { Search } from './Search';
 import { MyCollection } from './MyCollection';
+import { Cards } from './Cards';
 
 export default function App() {
   return (
@@ -29,6 +30,8 @@ export default function App() {
             <div className="flex-grow overflow-auto">
               <Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="/cards" element={<Cards />} />
+                <Route path="/pokeca" element={<Cards />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/profile" element={<Profile />} />
@@ -37,6 +40,7 @@ export default function App() {
                 <Route path="/create-want" element={<CreateWant />} />
                 <Route path="/listing/:id" element={<ListingDetail />} />
                 <Route path="/product/:id" element={<ProductDetail />} />
+                <Route path="/card/:id" element={<ProductDetail />} />
                 <Route path="/article/:id" element={<ArticleDetail />} />
                 <Route path="/articles" element={<Articles />} />
                 <Route path="/ai-scan" element={<AIScan />} />
