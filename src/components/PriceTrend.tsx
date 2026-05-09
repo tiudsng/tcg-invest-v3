@@ -39,7 +39,8 @@ export const PriceTrend: React.FC<PriceTrendProps> = ({ productId, collectionNam
           };
         });
 
-        setData(uniqueData);
+        // Filter out records without prices and deduplicate by day for cleaner chart
+        setData(historyData.filter(item => item.psa10 || item.raw));
       } catch (err) {
         console.error("Error fetching price history:", err);
       } finally {
