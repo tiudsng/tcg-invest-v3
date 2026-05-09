@@ -1,5 +1,5 @@
 {
-  "outputDirectory": "build/dist",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/api/(.*)",
