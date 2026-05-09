@@ -11,6 +11,23 @@ export class CardReader {
     const rawId = id.replace('snkrdunk_', '');
     const snkrId = id.startsWith('snkrdunk_') ? id : `snkrdunk_${id}`;
 
+    // Handle rank_XX format — query leaderboard directly, then resolve card_id
+    if (/^rank_\d+$/.test(id)) {
+      const lbRef = doc(db, 'leaderboard', id);
+      const lbSnap = await getDoc(lbRef);
+      if (lbSnap.exists()) {
+        const lbData = lbSnap.data();
+        const cardId = lbData.card_id || lbData.snkrdunk_id;
+        if (cardId) {
+          // Recursively resolve the actual card_id
+          return this.getCard(cardId);
+        }
+        // Fallback: return leaderboard doc adapted as Product
+        return this.adaptToProduct(id, lbData, 'leaderboard');
+      }
+      return null;
+    }
+
     let cardData: any = null;
     let source = '';
 
