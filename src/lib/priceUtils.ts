@@ -42,22 +42,36 @@ export const cleanMarketData = (cardId: string, data: any) => {
   
   // Normalize prices to numbers (HKD)
   // Priority: market_data.psa10_price_hkd -> data.psa10_hkd -> marketData.psa10_price (if parsed as HKD)
-  let snkrdunkPrice = parsePriceToHkd(
-    marketData.snkrdunk_price_hkd || 
-    marketData.psa10_price_hkd || 
-    data.psa10_hkd || 
-    marketData.snkrdunk_price || 
-    marketData.snkdunk_price || 
-    data.snkrdunk_price || 
-    data.price || 
-    0
-  );
+  // PSA10 and RAW prices are ALREADY in HKD (converted by scraper)
+  // They are stored as plain numbers >= 1000 in market_data.psa10_price / market_data.raw_price
+  // DO NOT pass through parsePriceToHkd again — that would double-convert (×0.052)
+  // Only use parsePriceToHkd when source field name suggests it's a raw JPY value
+  const getHkdPrice = (hkdField: string | number | undefined, jpyField: string | number | undefined): number => {
+    if (typeof hkdField === 'number' && hkdField >= 1000) {
+      // Already HKD — return directly
+      return hkdField;
+    }
+    if (hkdField) return parsePriceToHkd(hkdField);
+    if (jpyField) return parsePriceToHkd(jpyField);
+    return 0;
+  };
 
-  let ebayPrice = parsePriceToHkd(marketData.ebay_price_hkd || marketData.ebay_price || data.ebay_price || data.price || 0);
-  
-  // Specifically for PSA10 and Raw prices which might be in JPY in the raw market_data
-  const psa10Price = parsePriceToHkd(marketData.psa10_price_hkd || marketData.psa10_price || 0);
-  const rawPrice = parsePriceToHkd(marketData.raw_price_hkd || marketData.raw_price || 0);
+  const snkrdunkPrice = getHkdPrice(
+    marketData.snkrdunk_price_hkd || marketData.snkrdunk_price,
+    undefined
+  );
+  const ebayPrice = getHkdPrice(
+    marketData.ebay_price_hkd || marketData.ebay_price,
+    undefined
+  );
+  const psa10Price = getHkdPrice(
+    marketData.psa10_price,
+    marketData.psa10_latest_jpy
+  );
+  const rawPrice = getHkdPrice(
+    marketData.raw_price,
+    marketData.raw_latest_jpy
+  );
   
   // Keep raw prices for secondary display if needed
   const psa10PriceJpy = marketData.psa10_price_jpy || marketData.psa10_price || 0;
