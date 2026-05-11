@@ -169,36 +169,57 @@ export const PriceLeaderboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Reading from 'leaderboard' as requested, which contains the curated leaderboard data
+    // Refactored (2026-05-12): Read from 'rankings' collection which has:
+    // - snkrdunk_id → cross-ref with pokeca_gold for card metadata
+    // - market_data.psa10_price (flattened from pokeca_gold sync)
+    // - name (card display name from SNKRDUNK)
+    // pokeca_gold orderBy('rank') is the authoritative price ranking source
     const q = query(
-      collection(db, 'leaderboard'),
-      orderBy('rank', 'asc'),
-      limit(20)
+      collection(db, 'rankings'),
+      limit(10)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       console.log(`[PriceLeaderboard] Snapshot received with ${snapshot.docs.length} docs`);
       try {
-        let productsData = snapshot.docs.map((listDoc) => {
-          const listData = listDoc.data();
-          // Logging sample data
-          if (listDoc.id === 'rank_01') {
-            console.log(`[PriceLeaderboard] Rank 01 data:`, listData);
-          }
-          
-          const marketData = cleanMarketData(listDoc.id, listData);
+        // Get pokeca_gold data for all snkrdunk_ids in parallel
+        const snkrdunkIds = snapshot.docs.map(d => d.data().snkrdunk_id).filter(Boolean);
+        const goldRefs = snkrdunkIds.map(id => db.collection('pokeca_gold').doc(String(id)).get());
+        const goldSnaps = await Promise.all(goldRefs);
+        const goldMap = new Map<string, any>();
+        goldSnaps.forEach((snap, i) => {
+          if (snap.exists) goldMap.set(snkrdunkIds[i], snap.data());
+        });
+
+        let productsData = snapshot.docs.map((rankDoc) => {
+          const rankData = rankDoc.data();
+          const goldData = goldMap.get(rankData.snkrdunk_id) || {};
+          const marketData = cleanMarketData(rankDoc.id, {
+            ...rankData,
+            market_data: goldData.market_data || rankData.market_data || {}
+          });
 
           return {
-            ...listData,
-            id: listDoc.id,
-            card_id: listData.card_id || listDoc.id,
-            market_data: marketData
+            ...rankData,
+            ...goldData,
+            id: rankDoc.id,
+            name_zh: goldData.name_jp || rankData.name,
+            name_jp: goldData.name_jp,
+            name: goldData.name || rankData.name,
+            set_name: goldData.set_name || '',
+            card_number: goldData.card_number || '',
+            image_url: goldData.img_url,
+            market_data: marketData,
           } as Product;
         });
 
-        // Filter out items without valid ranks and ensure array order matches rank
-        productsData = productsData.filter(a => typeof a.rank === 'number' && !isNaN(a.rank));
-        productsData.sort((a, b) => (a.rank || 0) - (b.rank || 0));
+        // rankings doc IDs are "rank_01".."rank_10" — extract numeric rank
+        productsData = productsData.filter(a => a.id && /^rank_\d+$/.test(a.id));
+        productsData.sort((a, b) => {
+          const numA = parseInt(a.id.replace('rank_', ''), 10) || 0;
+          const numB = parseInt(b.id.replace('rank_', ''), 10) || 0;
+          return numA - numB;
+        });
         productsData = productsData.slice(0, 10);
 
         if (productsData.length === 0) {
