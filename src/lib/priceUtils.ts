@@ -2,7 +2,14 @@
 
 export const parsePriceToHkd = (val: string | number | undefined | null): number => {
   if (val === null || val === undefined) return 0;
-  if (typeof val === 'number') return val;
+  if (typeof val === 'number') {
+    // Plain numbers default to JPY (source systems return JPY)
+    // Only apply conversion for large values (JPY range), small values already HKD
+    if (val >= 1000) {
+      return Math.round(val * 0.052); // JPY to HKD
+    }
+    return val;
+  }
   
   const strVal = String(val).toUpperCase();
   // match digits and optional decimals
@@ -22,7 +29,11 @@ export const parsePriceToHkd = (val: string | number | undefined | null): number
     return Math.round(cleaned * 0.052); // JPY to HKD
   }
   
-  // Assume HKD if no specific currency match
+  // No currency marker found: treat as JPY if value looks like JPY (>=1000)
+  if (cleaned >= 1000) {
+    return Math.round(cleaned * 0.052); // JPY to HKD
+  }
+  // Small values already HKD
   return Math.round(cleaned);
 };
 
