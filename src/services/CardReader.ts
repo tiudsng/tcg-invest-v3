@@ -105,10 +105,28 @@ export class CardReader {
   private static adaptToProduct(id: string, data: any, source: string): Product {
     // If it already contains market_data, it's mostly structured
     // Normalize properties
-    
+
     let snkrdunk_id = data.snkrdunk_id || id.replace('snkrdunk_', '');
     let card_id = data.card_id || `snkrdunk_${snkrdunk_id}`;
-    
+
+    // Merge market_data: prefer market_data.* fields, but also pull from top-level
+    // and psa_data for leaderboard fallback
+    const psaData = data.psa_data || {};
+    const marketData = data.market_data || {};
+    const mergedMarketData = {
+      ...marketData,
+      // raw_price: prefer market_data.raw_price, fallback to top-level price
+      raw_price: marketData.raw_price ?? (data.price != null ? data.price : 0),
+      // PSA population: prefer market_data fields, fallback to psa_data
+      psa_pop_10: marketData.psa_pop_10 ?? psaData.psa10_count ?? data.psa_pop_10 ?? 0,
+      psa_pop_total: marketData.psa_pop_total ?? psaData.total_graded ?? data.psa_pop_total ?? 0,
+      psa_pop_10_percent: marketData.psa_pop_10_percent ?? psaData.psa10_ratio ?? data.psa_pop_10_percent ?? '',
+      // Ensure snkrdunk_price exists
+      snkrdunk_price: marketData.snkrdunk_price ?? marketData.psa10_price ?? data.price ?? 0,
+      psa10_price: marketData.psa10_price ?? data.price ?? 0,
+      source: marketData.source || source,
+    };
+
     return {
       id: id,
       card_id: card_id,
@@ -119,11 +137,7 @@ export class CardReader {
       set_code: data.set_code || '',
       card_number: data.card_number || data.slug || '',
       image_url: data.img_url || data.image_url || '',
-      market_data: {
-        ...(data.market_data || {}),
-        snkrdunk_price: data.price || data.market_data?.psa10_price || data.market_data?.snkrdunk_price || 0,
-        source: data.market_data?.source || source,
-      },
+      market_data: mergedMarketData,
       collection_name: source,
       ...data
     } as Product;
