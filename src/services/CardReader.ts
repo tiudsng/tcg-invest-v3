@@ -18,12 +18,10 @@ export class CardReader {
       if (lbSnap.exists()) {
         const lbData = lbSnap.data();
         const cardId = lbData.card_id || lbData.snkrdunk_id;
-        if (cardId) {
-          // Recursively resolve the actual card_id
-          return this.getCard(cardId);
-        }
-        // Fallback: return leaderboard doc adapted as Product
-        return this.adaptToProduct(id, lbData, 'leaderboard');
+      // ✅ FIX: leaderboard has complete display data including psa10_price & psa_pop
+      // Do NOT recurse to pokeca_gold — its null fields would overwrite good leaderboard data
+      // pokeca_gold is a supplemental card DB, not needed for leaderboard display
+      return this.adaptToProduct(id, lbData, 'leaderboard');
       }
       return null;
     }
