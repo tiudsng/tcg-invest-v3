@@ -4,7 +4,6 @@ on:
   schedule:
     # HKT 04:00 = UTC 20:00
     - cron: '0 20 * * *'
-  # 手動觸發 (可在 GitHub Actions 頁面按 Run workflow)
   workflow_dispatch:
     inputs:
       dry_run:
@@ -22,6 +21,9 @@ jobs:
     name: SNKRDUNK Price Sync
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: /home/runner/work/tcg-invest-v3/tcg-invest-v3
 
     steps:
       - name: Checkout repo
@@ -31,19 +33,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: /tmp/tcg-invest-v3/package-lock.json
 
       - name: Install npm packages
         run: npm install
-        working-directory: /tmp/tcg-invest-v3
 
       - name: Run SNKRDUNK scraper
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-          HOME: /home/runner
         run: |
-          # Inject service account from secret into expected path
           mkdir -p /home/runner/.hermes/firebase
           echo "$FIREBASE_SERVICE_ACCOUNT" > /home/runner/.hermes/firebase/gen-lang-client-0326385388-firebase-adminsdk.json
 
@@ -55,18 +52,18 @@ jobs:
           fi
 
           node scripts/scraper_snkrdunk.cjs $ARGS
-        working-directory: /tmp/tcg-invest-v3
 
       - name: Upload scrape log
         if: always()
-        run: |
-          echo "snkrdunk_last_run=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
-        shell: bash
+        run: echo "snkrdunk_last_run=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
 
   sync_pokeca:
     name: Pokeca-Chart PSA Sync
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: /home/runner/work/tcg-invest-v3/tcg-invest-v3
 
     steps:
       - name: Checkout repo
@@ -76,31 +73,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: /tmp/tcg-invest-v3/package-lock.json
 
       - name: Install npm packages
         run: npm install
-        working-directory: /tmp/tcg-invest-v3
-
-      - name: Inject Herman Proxy token
-        run: |
-          if [ -n "${{ secrets.HERMAN_PROXY_TOKEN }}" ]; then
-            echo "HERMAN_PROXY_TOKEN=${{ secrets.HERMAN_PROXY_TOKEN }}" >> $GITHUB_ENV
-          fi
 
       - name: Run Pokeca scraper
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-          HOME: /home/runner
         run: |
           mkdir -p /home/runner/.hermes/firebase
           echo "$FIREBASE_SERVICE_ACCOUNT" > /home/runner/.hermes/firebase/gen-lang-client-0326385388-firebase-adminsdk.json
           node scripts/scraper_pokeca.cjs
-        working-directory: /tmp/tcg-invest-v3
 
       - name: Upload scrape log
         if: always()
-        run: |
-          echo "pokeca_last_run=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
-        shell: bash
+        run: echo "pokeca_last_run=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
