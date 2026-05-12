@@ -3,8 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "scripts": {
-    "dev": "tsx server.ts",
+"scripts": {
+        "start": "node index.js",
+        "sync:s": "node scripts/scraper_snkrdunk.cjs",
+        "sync:pokeca": "node scripts/scraper_pokeca.cjs",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --outfile=dist/server.js --packages=external",
     "start": "node dist/server.js",
     "preview": "vite preview",
