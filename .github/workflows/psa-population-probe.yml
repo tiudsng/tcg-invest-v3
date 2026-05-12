@@ -16,8 +16,9 @@ jobs:
 
       - name: Install deps
         run: |
-          npm install --include=dev 2>&1 | tail -5
-          ls node_modules | grep puppeteer
+          npm ci --include=dev 2>&1 | tail -10
+          echo "--- node_modules check ---"
+          ls node_modules | grep -E "^puppeteer" || echo "NOT FOUND"
 
       - name: Run PSA population scraper
         run: node scripts/psa_population_probe.cjs
