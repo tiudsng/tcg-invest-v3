@@ -18,94 +18,93 @@ jobs:
         run: |
           npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth --save-dev 2>&1 | tail -3
 
-      - name: Extract PSA population via Puppeteer
-        run: node -e "
-const puppeteerExtra = require('puppeteer-extra');
-const stealthPlugin = require('puppeteer-extra-plugin-stealth')();
-puppeteerExtra.use(stealthPlugin);
+      - name: Extract PSA population
+        run: |
+          node << 'NODESCRIPT'
+          const puppeteerExtra = require('puppeteer-extra');
+          const stealthPlugin = require('puppeteer-extra-plugin-stealth')();
+          puppeteerExtra.use(stealthPlugin);
 
-(async () => {
-  const browser = await puppeteerExtra.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-  const page = await browser.newPage();
-  await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
-  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
+          (async () => {
+            const browser = await puppeteerExtra.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+            const page = await browser.newPage();
+            await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
+            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
 
-  const url = 'https://www.pricecharting.com/game/pokemon-japanese-promo/armored-mewtwo-365sm-p';
-  console.log('Navigating to:', url);
-  const resp = await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-  console.log('HTTP Status:', resp.status());
-  await page.waitForTimeout(5000);
+            const url = 'https://www.pricecharting.com/game/pokemon-japanese-promo/armored-mewtwo-365sm-p';
+            console.log('Navigating to:', url);
+            const resp = await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+            console.log('HTTP Status:', resp.status());
+            await page.waitForTimeout(5000);
 
-  // Try to find PSA census data via multiple strategies
-  const result = await page.evaluate(() => {
-    const body = document.body.innerText;
-    const ret = { success: false, psa10: null, psa9: null, total: null, pct: null, raw: '' };
+            const result = await page.evaluate(() => {
+              const body = document.body.innerText;
+              const ret = { success: false, psa10: null, psa9: null, total: null, pct: null, snippets: [] };
 
-    // Strategy 1: Look for 'PSA 10' in table rows
-    const rows = document.querySelectorAll('tr');
-    rows.forEach(row => {
-      const cells = row.querySelectorAll('td');
-      if (cells.length >= 2) {
-        const label = cells[0].innerText.trim();
-        const val = cells[1].innerText.trim();
-        if (/psa\s*10/i.test(label)) ret.psa10 = val;
-        if (/psa\s*9/i.test(label)) ret.psa9 = val;
-        if (/total|all|census/i.test(label)) ret.total = val;
-      }
-    });
+              // Strategy 1: table rows
+              const rows = document.querySelectorAll('tr');
+              rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 2) {
+                  const label = cells[0].innerText.trim();
+                  const val = cells[1].innerText.trim();
+                  if (/psa\s*10/i.test(label)) ret.psa10 = val;
+                  if (/psa\s*9/i.test(label)) ret.psa9 = val;
+                  if (/total|all census/i.test(label)) ret.total = val;
+                }
+              });
 
-    // Strategy 2: Look for specific text patterns
-    const psa10Match = body.match(/PSA\s*10[:\s]*(\d[\d,]*)/i) || body.match(/PSA 10[^0-9]*(\d[\d,]*)/);
-    const totalMatch = body.match(/Total[^0-9]*(\d[\d,]*)/i) || body.match(/Census[^0-9]*(\d[\d,]*)/i);
-    if (psa10Match) ret.psa10 = psa10Match[1];
-    if (totalMatch) ret.total = totalMatch[1];
+              // Strategy 2: text patterns
+              const psa10Match = body.match(/PSA 10[^0-9]*(\d[\d,]*)/i);
+              const totalMatch = body.match(/(?:Total|Census)[^0-9]*(\d[\d,]*)/i);
+              if (psa10Match) ret.psa10 = psa10Match[1];
+              if (totalMatch) ret.total = totalMatch[1];
 
-    // Strategy 3: Look for population table
-    const tables = document.querySelectorAll('table');
-    tables.forEach(t => {
-      const txt = t.innerText;
-      if (/psa/i.test(txt)) {
-        ret.raw += 'TABLE:' + txt.slice(0, 500) + '\n';
-      }
-    });
+              // Strategy 3: tables with psa
+              const tables = document.querySelectorAll('table');
+              tables.forEach(t => {
+                const txt = t.innerText;
+                if (/psa/i.test(txt)) {
+                  ret.snippets.push('TABLE: ' + txt.slice(0, 400));
+                }
+              });
 
-    // Strategy 4: Find any div/section with 'Population' or 'Census'
-    const sections = document.querySelectorAll('div, section, h2, h3, h4');
-    sections.forEach(s => {
-      const t = s.innerText || '';
-      if (/population|census/i.test(t) && t.length < 1000) {
-        ret.raw += 'SECTION:' + t.slice(0, 200) + '\n';
-      }
-    });
+              // Strategy 4: population sections
+              document.querySelectorAll('div, section').forEach(s => {
+                const t = s.innerText || '';
+                if (/population/i.test(t) && t.length < 800) {
+                  ret.snippets.push('SECTION: ' + t.slice(0, 200));
+                }
+              });
 
-    // Calculate percentage if we have both
-    if (ret.psa10 && ret.total) {
-      const p = parseInt(ret.psa10.replace(/,/g,''));
-      const t = parseInt(ret.total.replace(/,/g,''));
-      if (!isNaN(p) && !isNaN(t) && t > 0) {
-        ret.pct = ((p/t)*100).toFixed(2) + '%';
-        ret.success = true;
-      }
-    }
+              // Calculate pct
+              if (ret.psa10 && ret.total) {
+                const p = parseInt(ret.psa10.replace(/,/g,''));
+                const t = parseInt(ret.total.replace(/,/g,''));
+                if (!isNaN(p) && !isNaN(t) && t > 0) {
+                  ret.pct = ((p/t)*100).toFixed(2) + '%';
+                  ret.success = true;
+                }
+              }
 
-    ret.bodySnippet = body.slice(0, 500);
-    return ret;
-  });
+              ret.bodySnippet = body.slice(0, 400);
+              return ret;
+            });
 
-  console.log('\\n=== PSA Population Data ===');
-  console.log('Success:', result.success);
-  console.log('PSA 10:', result.psa10);
-  console.log('PSA 9:', result.psa9);
-  console.log('Total:', result.total);
-  console.log('Percentage:', result.pct);
-  console.log('\\nRaw snippets:');
-  console.log(result.raw || '(none)');
-  console.log('\\nBody snippet:');
-  console.log(result.bodySnippet);
+            console.log('\n=== PSA Population Data ===');
+            console.log('Success:', result.success);
+            console.log('PSA 10:', result.psa10);
+            console.log('PSA 9:', result.psa9);
+            console.log('Total:', result.total);
+            console.log('Percentage:', result.pct);
+            console.log('\nSnippets:');
+            result.snippets.forEach(s => console.log(' ', s));
+            console.log('\nBody snippet:');
+            console.log(result.bodySnippet);
 
-  await browser.close();
-  process.exit(result.success ? 0 : 1);
-})().catch(e => { console.error('FATAL:', e.message); process.exit(1); });
-" 2>&1
+            await browser.close();
+            process.exit(result.success ? 0 : 1);
+          })().catch(e => { console.error('FATAL:', e.message); process.exit(1); });
+          NODESCRIPT
         env:
           NODE_OPTIONS: --max-old-space-size=512
