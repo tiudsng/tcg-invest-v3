@@ -89,3 +89,39 @@ jobs:
       - name: Upload scrape log
         if: always()
         run: echo "pokeca_last_run=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
+
+  probe_pricecharting:
+    name: Probe PriceCharting Runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: /home/runner/work/tcg-invest-v3/tcg-invest-v3
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install stealth deps
+        run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth --save-dev 2>&1 | tail -3
+
+      - name: Runner public IP
+        run: echo "Runner IP: $(curl -s ifconfig.me)"
+
+      - name: Probe PriceCharting (curl_cffi)
+        run: |
+          pip install curl_cffi -q
+          STATUS=$(python3 -c "
+from curl_cffi import requests
+r = requests.get('https://www.pricecharting.com', impersonate='chrome120', timeout=15)
+print(r.status_code)
+" 2>/dev/null)
+          echo "curl_cffi status: $STATUS"
+
+      - name: Probe PriceCharting (Puppeteer Stealth)
+        run: node scripts/scraper_pricecharting.cjs --dry-run 2>&1
