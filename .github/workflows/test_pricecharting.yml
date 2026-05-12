@@ -4,24 +4,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: |
-          npm install puppeteer --silent
-          node -e "
-const puppeteer = require('puppeteer');
-(async () => {
-  const browser = await puppeteer.launch({headless: 'new', args:['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage']});
-  const page = await browser.newPage();
-  await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-  const resp = await page.goto('https://www.pricecharting.com/game/pokemon-japanese-promo/armored-mewtwo-365sm-p', {waitUntil:'networkidle2', timeout:30000});
-  console.log('HTTP Status:', resp.status());
-  const content = await page.content();
-  console.log('Cloudflare_blocked:', content.includes('Cloudflare') ? 'YES' : 'NO');
-  console.log('PSA_population:', content.includes('PSA') ? 'YES' : 'NO');
-  await browser.close();
-  process.exit(0);
-})().catch(e => { console.error(e); process.exit(1); });
+      - name: Test curl_cffi
+        run: |
+          pip install curl_cffi -q
+          python3 -c "
+from curl_cffi import requests
+r = requests.get('https://www.pricecharting.com', impersonate='chrome120', timeout=15)
+print('Status:', r.status_code)
+print('Cloudflare:', 'Cloudflare' in r.text)
 "
+      - name: Test raw curl
+        run: |
+          STATUS=$(curl -s -L -o /tmp/pc_test.txt -w "%{http_code}" https://www.pricecharting.com)
+          echo "HTTP Status: $STATUS"
+          grep -o "Cloudflare" /tmp/pc_test.txt | head -1 || echo "No Cloudflare"
