@@ -1,5 +1,8 @@
 name: PSA Population Probe
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [psa-population-probe]
 jobs:
   probe:
     runs-on: ubuntu-latest
