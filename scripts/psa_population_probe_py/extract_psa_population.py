@@ -49,26 +49,26 @@ def extract_psa_population(html: str) -> dict:
         "raw": None,
     }
 
-    # Strategy 1: Extract VGPC.pop_data (the confirmed data source)
-    pop_match = re.search(
-        r'VGPC\.pop_data\s*=\s*(\{"psa":\s*\[.*?\]\})',
-        html
-    )
-    if pop_match:
+    # Strategy 1: Extract psa array from VGPC.pop_data directly
+    # Format: VGPC.pop_data = {"psa":[86,98,252,...],"cgc":[...]}
+    psa_match = re.search(r'"psa":\s*\[([\d,]+)\]', html)
+    if psa_match:
         try:
-            pop_str = pop_match.group(1)
-            # Fix potential JS object shorthand
-            pop_str_fixed = re.sub(r'(\w+):', r'"\1":', pop_str)
-            pop_data = json.loads(pop_str_fixed)
-            psa = pop_data.get("psa", [])
+            psa = [int(x) for x in psa_match.group(1).split(',')]
             if len(psa) == 10:
-                result["psa9"] = psa[8]   # PSA 9
-                result["psa10"] = psa[9]  # PSA 10
+                result["psa9"] = psa[8]    # PSA 9
+                result["psa10"] = psa[9]   # PSA 10
                 result["total"] = sum(psa)
                 result["success"] = True
-                result["raw"] = f"VGPC.pop_data psa={psa}"
-        except json.JSONDecodeError:
+                result["raw"] = f"psa array: {psa}"
+        except ValueError:
             pass
+
+    # Strategy 2: Fallback - extract VGPC.pop_data full object
+    if not result["success"]:
+        pop_match = re.search(r'VGPC\.pop_data\s*=\s*(\{[^}]+\})', html)
+        if pop_match:
+            result["raw"] = pop_match.group(1)[:200]
 
     # Strategy 2: Fallback - look for pop_data with different variable name
     if not result["success"]:
