@@ -1,0 +1,25 @@
+name: Probe Runner IP
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'URL to test'
+        required: false
+        default: 'https://www.pricecharting.com'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check runner IP
+        run: |
+          echo "=== Runner Public IP ==="
+          curl -s ifconfig.me
+          echo ""
+          echo "=== curl_cffi test ==="
+          pip install curl_cffi -q
+          python3 -c "
+from curl_cffi import requests
+r = requests.get('https://www.pricecharting.com', impersonate='chrome120', timeout=15)
+print('Status:', r.status_code)
+print('Cloudflare:', 'Cloudflare' in r.text)
+"
