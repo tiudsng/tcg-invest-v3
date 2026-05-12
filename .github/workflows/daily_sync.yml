@@ -1,0 +1,32 @@
+name: TCG Invest Daily Sync
+
+on:
+  schedule:
+    # 每天香港時間凌晨 4:00 運行 (UTC 20:00)
+    - cron: '0 20 * * *'
+  workflow_dispatch: # 容許手動點擊按鈕觸發
+
+jobs:
+  scrape_and_sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Write Firebase credentials
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > /tmp/firebase-creds.json
+
+      - name: Run Scraper
+        run: node scripts/scraper_pokeca.cjs --limit=600
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-creds.json

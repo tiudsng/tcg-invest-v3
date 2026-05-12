@@ -178,8 +178,8 @@ class TcgScraperBase {
 
 class PokecaGoldScraper extends TcgScraperBase {
   constructor() {
-    super(
-      '/home/ubuntu/.hermes/firebase/gen-lang-client-0326385388-firebase-adminsdk.json',
+    const __credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || '/home/ubuntu/.hermes/firebase/gen-lang-client-0326385388-firebase-adminsdk.json';
+    super(__credPath,
       'gen-lang-client-0326385388',
       'ai-studio-507f7bd1-f48e-48fd-940f-92d962f6658b'
     );
@@ -228,7 +228,7 @@ class PokecaGoldScraper extends TcgScraperBase {
 async function main() {
   const { Firestore } = require('@google-cloud/firestore');
   const db = new Firestore({
-    credentials: require('/home/ubuntu/.hermes/firebase/gen-lang-client-0326385388-firebase-adminsdk.json'),
+    credentials: require(process.env.GOOGLE_APPLICATION_CREDENTIALS || '/home/ubuntu/.hermes/firebase/gen-lang-client-0326385388-firebase-adminsdk.json'),
     projectId: 'gen-lang-client-0326385388',
     databaseId: 'ai-studio-507f7bd1-f48e-48fd-940f-92d962f6658b'
   });
