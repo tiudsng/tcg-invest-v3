@@ -1,0 +1,17 @@
+name: PSA Population Probe (Python)
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [psa-population-probe-py]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install curl_cffi
+        run: pip install curl_cffi -q
+
+      - name: Run PSA population scraper
+        run: python3 scripts/psa_population_probe_py/extract_psa_population.py
