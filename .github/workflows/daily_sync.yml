@@ -113,17 +113,14 @@ jobs:
         run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth --save-dev 2>&1 | tail -3
 
       - name: Runner public IP
-        run: echo "Runner IP: $(curl -s ifconfig.me)"
+        run: |
+          IP=$(curl -s ifconfig.me)
+          echo "Runner IP: $IP"
 
       - name: Probe PriceCharting (curl_cffi)
         run: |
           pip install curl_cffi -q
-          STATUS=$(python3 -c "
-from curl_cffi import requests
-r = requests.get('https://www.pricecharting.com', impersonate='chrome120', timeout=15)
-print(r.status_code)
-" 2>/dev/null)
-          echo "curl_cffi status: $STATUS"
+          python3 -c 'from curl_cffi import requests; r = requests.get("https://www.pricecharting.com", impersonate="chrome120", timeout=15); print("Status:", r.status_code)'
 
       - name: Probe PriceCharting (Puppeteer Stealth)
         run: node scripts/scraper_pricecharting.cjs --dry-run 2>&1
