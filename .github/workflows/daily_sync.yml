@@ -83,6 +83,7 @@ jobs:
         run: |
           mkdir -p /home/runner/.hermes/firebase
           echo "$FIREBASE_SERVICE_ACCOUNT" > /home/runner/.hermes/firebase/gen-lang-client-0326385388-firebase-adminsdk.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/home/runner/.hermes/firebase/gen-lang-client-0326385388-firebase-adminsdk.json
           node scripts/scraper_pokeca.cjs
 
       - name: Upload scrape log
