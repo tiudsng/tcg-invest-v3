@@ -1,0 +1,35 @@
+name: Probe PriceCharting Runner
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install deps
+        run: |
+          npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth --save-dev 2>&1 | tail -5
+
+      - name: Check runner IP
+        run: |
+          echo "=== Runner Public IP ==="
+          curl -s ifconfig.me
+          echo ""
+
+      - name: Run PriceCharting scraper (dry-run)
+        run: |
+          node scripts/scraper_pricecharting.cjs --dry-run 2>&1
+        timeout-minutes: 3
+
+      - name: Fallback: curl_cffi test
+        run: |
+          pip install curl_cffi -q
+          python3 -c "
+from curl_cffi import requests
+r = requests.get('https://www.pricecharting.com', impersonate='chrome120', timeout=15)
+print('Status:', r.status_code)
+print('Cloudflare:', 'Cloudflare' in r.text)
+"
