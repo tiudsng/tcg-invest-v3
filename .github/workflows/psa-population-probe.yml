@@ -16,7 +16,7 @@ jobs:
 
       - name: Install deps
         run: |
-          npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth --save-dev 2>&1 | tail -3
+          npm install 2>&1 | tail -5
 
       - name: Run PSA population scraper
         run: node scripts/psa_population_probe.cjs
