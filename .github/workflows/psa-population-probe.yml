@@ -16,7 +16,7 @@ jobs:
 
       - name: Install deps
         run: |
-          npm install 2>&1 | tail -5
+          NODE_ENV=development npm install --include=dev 2>&1 | tail -8
 
       - name: Run PSA population scraper
         run: node scripts/psa_population_probe.cjs
