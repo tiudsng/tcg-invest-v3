@@ -7,7 +7,7 @@ Cron: 每 4 小時 GitHub Actions
 import os
 import sys
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -19,7 +19,7 @@ API_URL = "https://open.er-api.com/v6/latest/JPY"
 # ─── Logger ───────────────────────────────────────────────────────────────────
 
 def log(msg):
-    ts = datetime.utcnow().strftime("%H:%M:%S")
+    ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
     print(f"[{ts}] {msg}")
 
 # ─── Core ─────────────────────────────────────────────────────────────────────
