@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """
-psa_population_probe.py — Extract PSA population from PriceCharting using curl_cffi
-Use browser UA to get JS-rendered content, then extract population data.
+PSA Population Extractor for PriceCharting
+Uses curl_cffi (no Puppeteer needed!)
+
+Data format discovered:
+  VGPC.pop_data = {"psa":[86,98,252,725,1164,1761,1318,1708,2219,3792]}
+  Index:         Grade:  1   2   3   4   5   6    7    8    9   10
+  psa[0]=86 → PSA 1, psa[9]=3792 → PSA 10
 
 Usage:
   python3 scripts/psa_population_probe_py/extract_psa_population.py
   python3 scripts/psa_population_probe_py/extract_psa_population.py --url "https://www.pricecharting.com/game/..."
+  python3 scripts/psa_population_probe_py/extract_psa_population.py --url "..." --format json
 """
 
 import argparse
@@ -15,13 +21,13 @@ import json
 from curl_cffi import requests
 
 DEFAULT_URL = "https://www.pricecharting.com/game/pokemon-japanese-promo/armored-mewtwo-365sm-p"
+IMPERSONATE = "chrome120"
 
 
 def fetch_page(url: str) -> tuple[str, int]:
-    """Fetch PriceCharting page with Chrome UA."""
     resp = requests.get(
         url,
-        impersonate="chrome120",
+        impersonate=IMPERSONATE,
         timeout=30,
         headers={
             "Accept-Language": "en-US,en;q=0.9",
@@ -31,119 +37,94 @@ def fetch_page(url: str) -> tuple[str, int]:
     return resp.text, resp.status_code
 
 
-def extract_psa_data(html: str) -> dict:
-    """Extract PSA 10 count, total PSA count, and percentage from HTML."""
+def extract_psa_population(html: str) -> dict:
+    """Extract PSA population data from PriceCharting HTML."""
     result = {
         "success": False,
         "psa10": None,
         "psa9": None,
+        "psa10_pct": None,
         "total": None,
-        "pct": None,
-        "snippets": [],
         "price_usd": None,
+        "raw": None,
     }
 
-    # Strategy 1: Price (PSA 10 price in USD - we know this exists)
-    price_match = re.search(r'\$([0-9,]+\.?\d*)', html)
+    # Strategy 1: Extract VGPC.pop_data (the confirmed data source)
+    pop_match = re.search(
+        r'VGPC\.pop_data\s*=\s*(\{"psa":\s*\[.*?\]\})',
+        html
+    )
+    if pop_match:
+        try:
+            pop_str = pop_match.group(1)
+            # Fix potential JS object shorthand
+            pop_str_fixed = re.sub(r'(\w+):', r'"\1":', pop_str)
+            pop_data = json.loads(pop_str_fixed)
+            psa = pop_data.get("psa", [])
+            if len(psa) == 10:
+                result["psa9"] = psa[8]   # PSA 9
+                result["psa10"] = psa[9]  # PSA 10
+                result["total"] = sum(psa)
+                result["success"] = True
+                result["raw"] = f"VGPC.pop_data psa={psa}"
+        except json.JSONDecodeError:
+            pass
+
+    # Strategy 2: Fallback - look for pop_data with different variable name
+    if not result["success"]:
+        pop_match2 = re.search(
+            r'\.pop_data\s*=\s*(\{"[^}]+\})',
+            html
+        )
+        if pop_match2:
+            result["raw"] = pop_match2.group(0)[:200]
+
+    # Strategy 3: Price extraction (PSA 10 price in USD)
+    price_match = re.search(r'\$\s*([0-9,]+\.?\d*)', html)
     if price_match:
         result["price_usd"] = price_match.group(0)
-        result["snippets"].append(f"Price found: {result['price_usd']}")
 
-    # Strategy 2: Look for inline JSON in script tags (common for chart data)
-    # Look for population data in JSON format
-    json_patterns = [
-        r'population["\s:]+(\d+)',
-        r'psa10["\s:]+(\d+)',
-        r'psa9["\s:]+(\d+)',
-        r'"total"[^}]*?(\d+)',
-        r'Census[^0-9]*?(\d+)',
-    ]
-    for pat in json_patterns:
-        m = re.search(pat, html, re.IGNORECASE)
-        if m:
-            result["snippets"].append(f"JSON pattern '{pat}': {m.group(0)}")
-
-    # Strategy 3: Look for data in specific divs or attributes
-    data_attrs = re.findall(r'data-(?:population|psa|grade|census)[=\s]["\']([^"\']{1,100})["\']', html, re.IGNORECASE)
-    for d in data_attrs[:5]:
-        result["snippets"].append(f"data-attr: {d}")
-
-    # Strategy 4: Look for JavaScript variables with population data
-    js_vars = re.findall(r'(?:var|const|let)\s+\w*(?:population|psa|census)\w*\s*=\s*([^;]{1,200})', html, re.IGNORECASE)
-    for v in js_vars[:5]:
-        result["snippets"].append(f"JS var: {v[:150]}")
-
-    # Strategy 5: Find population table in HTML
-    table_match = re.search(r'<table[^>]*class="[^"]*population[^"]*"[^>]*>(.*?)</table>', html, re.DOTALL | re.IGNORECASE)
-    if table_match:
-        result["snippets"].append(f"Population table: {table_match.group(0)[:300]}")
-
-    # Strategy 6: Look for chart config with population data
-    chart_configs = re.findall(r'(?:population|census|psa[^0-9]*?\d{2,})', html, re.IGNORECASE)
-    if chart_configs:
-        result["snippets"].append(f"Chart configs found: {chart_configs[:10]}")
-
-    # Strategy 7: Find all numbers that look like population counts (3-7 digits)
-    # near population-related keywords
-    lines_with_pop = []
-    for line in html.split('\n'):
-        if re.search(r'(?:population|census|psa|grade)', line, re.IGNORECASE):
-            nums = re.findall(r'\b(\d{3,7})\b', line)
-            if nums:
-                lines_with_pop.append(f"{line.strip()[:200]} -> {nums}")
-
-    for lp in lines_with_pop[:10]:
-        result["snippets"].append(f"POP_LINE: {lp}")
-
-    # Strategy 8: Try to find the API call that PriceCharting makes
-    # Usually it's something like /api/market-data or /api/population
-    api_patterns = [
-        r'["\'](/api/[^"\']+)["\']',
-        r'fetch\(["\']([^"\']+)["\']',
-        r'\.get\(["\']([^"\']+population[^"\']+)["\']',
-    ]
-    for pat in api_patterns:
-        matches = re.findall(pat, html, re.IGNORECASE)
-        for m in matches[:5]:
-            result["snippets"].append(f"API candidate: {m}")
-
-    # Strategy 9: Look for URL patterns in JavaScript
-    url_patterns = re.findall(r'["\']([^"\']*?(?:api|market|population|psa)[^"\']{0,100})["\']', html, re.IGNORECASE)
-    for up in url_patterns[:10]:
-        if len(up) < 200:
-            result["snippets"].append(f"URL pattern: {up}")
+    # Calculate percentage
+    if result["psa10"] and result["total"]:
+        try:
+            p10 = int(result["psa10"])
+            total = int(result["total"])
+            if total > 0:
+                result["psa10_pct"] = f"{(p10 / total * 100):.2f}%"
+        except (ValueError, TypeError):
+            pass
 
     return result
 
 
 def main():
-    parser = argparse.ArgumentParser(description="PSA Population Scraper")
+    parser = argparse.ArgumentParser(description="PSA Population Extractor")
     parser.add_argument("--url", default=DEFAULT_URL)
+    parser.add_argument("--format", default="text", choices=["text", "json"])
     args = parser.parse_args()
 
-    print(f"Fetching: {args.url}")
+    print(f"Fetching: {args.url}", file=sys.stderr)
     html, status = fetch_page(args.url)
-    print(f"HTTP Status: {status}")
 
     if status != 200:
-        print(f"Failed with status {status}")
+        print(f"HTTP {status}", file=sys.stderr)
         sys.exit(1)
 
-    data = extract_psa_data(html)
+    data = extract_psa_population(html)
 
-    print("\n=== Results ===")
-    print(f"Success: {data['success']}")
-    print(f"Price USD: {data['price_usd']}")
-    print(f"PSA 10: {data['psa10']}")
-    print(f"PSA 9: {data['psa9']}")
-    print(f"Total: {data['total']}")
-    print(f"Percentage: {data['pct']}")
-    if data["snippets"]:
-        print(f"\nSnippets ({len(data['snippets'])}):")
-        for s in data["snippets"][:30]:
-            print(f"  {s[:200]}")
+    if args.format == "json":
+        print(json.dumps(data, indent=2))
+    else:
+        print("\n=== PSA Population Data ===")
+        print(f"Success: {data['success']}")
+        print(f"PSA 10 population: {data['psa10']}")
+        print(f"PSA 9 population:  {data['psa9']}")
+        print(f"Total PSA:        {data['total']}")
+        print(f"PSA 10 %%:         {data['psa10_pct']}")
+        print(f"Price (USD):      {data['price_usd']}")
+        print(f"Raw source:       {data['raw']}")
 
-    sys.exit(0 if data["success"] else 0)  # Always exit 0 for probe
+    sys.exit(0 if data["success"] else 1)
 
 
 if __name__ == "__main__":
