@@ -2,6 +2,16 @@
 const { Firestore } = require('@google-cloud/firestore');
 const https = require('https');
 
+// ── Percent sanitizer ─────────────────────────────────────────────────────────
+function sanitizePct(val) {
+  if (val === undefined || val === null) return '0%';
+  const s = String(val);
+  if (s === 'undefined' || s === 'null' || s === '') return '0%';
+  const clean = s.replace(/%+/g, '').trim();
+  const num = parseFloat(clean);
+  return isNaN(num) ? '0%' : `${num}%`;
+}
+
 const db = new Firestore({
   credentials: require('/home/ubuntu/.hermes/firebase/gen-lang-client-0326385388-firebase-adminsdk.json'),
   projectId: 'gen-lang-client-0326385388',
@@ -69,7 +79,7 @@ async function main() {
           'market_data.last_raw_jpy': rawJpy,
           'market_data.psa_pop_10': info.grd_status_10,
           'market_data.psa_pop_total': info.grd_status_all,
-          'market_data.psa_pop_10_percent': info.grd_status_pct + '%',
+          'market_data.psa_pop_10_percent': sanitizePct(info.grd_status_pct),
           'market_data.updatedAt': new Date().toISOString()
         });
         console.log('  -> Updated!');
