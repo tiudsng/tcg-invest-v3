@@ -98,78 +98,58 @@ def extract_psa_data(html: str) -> Optional[dict]:
 
 # ── URL Discovery Patterns ───────────────────────────────────────────────────
 def generate_candidates(set_code: str, card_number: str, name_jp: str = "") -> list:
-    """Generate candidate URLs based on set_code and name patterns."""
-    
-    # Normalize card number
-    num = card_number.lstrip('0').zfill(3) if card_number.isdigit() else card_number
+    """Generate candidate URLs for a card."""
+    num = card_number.lstrip('0').zfill(3) if card_number.replace("/", "", 1).isdigit() else card_number
     num_raw = card_number.replace("/", "-")
     
-    # Extract romanized keywords from Japanese name
-    keywords = []
+    # Clean name for slug
     name_lower = name_jp.lower()
+    for jp, en in [('ミュウツー', 'mewtwo'), ('ミュウ', 'mew'), (' Pikachu', 'pikachu'),
+                    ('リザードン', 'charizard'), ('ラプラス', 'lapras'), ('サンダース', 'jolteon'),
+                    ('而上', ''), ('EX', 'ex'), ('VMAX', 'vmax'), ('VSTAR', 'vstar'),
+                    ('GX', 'gx'), ('SR', 'sr'), ('RR', 'rr'), ('UR', 'ur'),
+                    ('SAR', 'sar'), ('1ED', '1ed'), ('HR', 'hr'), ('★', 'star'),
+                    ('☆', 'star'), (' ', '-')]:
+        name_lower = name_lower.replace(jp.lower(), en.lower())
     
-    # Known set → category mappings (auto-generated)
-    set_category_hints = {
-        'sm11': ['pokemon-japanese-sky-legend', 'pokemon-japanese-sm11', 'pokemon-sun-moon-promos'],
-        'swsh6': ['pokemon-sword-shield-fusion-strike', 'pokemon-sword-shield', 'pokemon-swsh6'],
-        'xy9': ['pokemon-xy-fates', 'pokemon-xy', 'pokemon-black-white'],
-        'base1': ['pokemon-base', 'pokemon-wizards-black-star-promos'],
-        'm2': ['pokemon-x2-116', 'pokemon-m2'],
-        # SV series
+    name_slug = re.sub(r'[^a-z0-9]+', '-', name_lower).strip('-')[:50]
+    name_slug_encoded = name_slug.replace('&', '%26')
+    
+    # Set → category hints (expanded)
+    set_hints = {
+        'sm11': ['pokemon-japanese-sky-legend', 'pokemon-japanese-sm11', 'pokemon-sun-moon-promos', 'pokemon-japanese-miracle-twins'],
+        'swsh6': ['pokemon-sword-shield-fusion-strike', 'pokemon-sword-shield', 'pokemon-swsh'],
+        'xy9': ['pokemon-xy-fates', 'pokemon-xy'],
+        'base1': ['pokemon-wizards-black-star-promos', 'pokemon-base', 'pokemon-promo'],
+        'm2': ['pokemon-x2', 'pokemon-m2'],
         'sv2d': ['pokemon-scarlet-violet-prismatic-evolution', 'pokemon-scarlet-violet'],
         'sv4a': ['pokemon-scarlet-violet-temporal-forces', 'pokemon-scarlet-violet'],
         's12a': ['pokemon-twisted-space', 'pokemon-scarlet-violet'],
-        # Promo patterns
-        'sm-p': ['pokemon-sun-moon-promos', 'pokemon-japanese-promo'],
-        'sv-p': ['pokemon-scarlet-violet-promos', 'pokemon-japanese-promo'],
+        'sv3a': ['pokemon-scarlet-violet-obsidian-flames', 'pokemon-scarlet-violet'],
+        'sv5a': ['pokemon-scarlet-violet-paldea-evolved', 'pokemon-scarlet-violet'],
     }
     
-    # Build name slug
-    name_slug = name_jp
-    # Replace Japanese chars with common romanizations
-    replacements = [
-        ('ミュウツー', 'mewtwo'), ('ミュウ', 'mew'), (' Pikachu', 'pikachu'),
-        ('リザードン', 'charizard'), ('エレキブル', 'electivire'),
-        ('ミュウツー', 'mewtwo'), ('カイリュー', 'dragonite'),
-        ('ラプラス', 'lapras'), ('サンダース', 'jolteon'),
-        ('サニーゴ', 'sunkern'), ('不上', ''),
-    ]
-    for jp, en in replacements:
-        name_slug = name_slug.replace(jp, en)
-    
-    # Clean slug
-    name_slug = re.sub(r'[^a-z0-9]+', '-', name_slug.lower()).strip('-')
-    name_slug_encoded = name_slug.replace('&', '%26')
-    
-    categories = set_category_hints.get(set_code, [
-        'pokemon-japanese-promo',
-        'pokemon-japanese-set',
-    ])
+    categories = set_hints.get(set_code, ['pokemon-japanese-promo', 'pokemon-promo'])
     
     candidates = []
     slug_variants = [
         f"{name_slug}-{num}",
-        f"{name_slug}-{num_raw}",
         f"{name_slug_encoded}-{num}",
+        f"{name_slug}-{num_raw}",
     ]
     
     for cat in categories:
         for slug in slug_variants:
-            url = f"https://www.pricecharting.com/game/{cat}/{slug}"
-            candidates.append((url, slug))
+            candidates.append((f"https://www.pricecharting.com/game/{cat}/{slug}", slug))
     
-    # Also try generic search URL
-    search_query = f"{set_code}+{num}+{name_slug}".replace(" ", "+")[:100]
-    candidates.append((f"https://www.pricecharting.com/search-products?q={search_query}&type=prices", "search"))
-    
-    return candidates[:12]  # Limit to avoid too many candidates
+    return candidates[:15]
 
 # ── Async HTTP Fetcher ────────────────────────────────────────────────────────
 async def fetch_url(session, url: str) -> dict:
     """Async fetch a single URL."""
     try:
-        resp = await asyncio.to_thread(
-            session.get, url,
+        resp = await session.get(
+            url,
             headers=HEADERS,
             impersonate="chrome",
             timeout=15
@@ -183,11 +163,10 @@ async def fetch_url(session, url: str) -> dict:
                 "status": 200,
                 "title": title,
                 "psa": psa,
-                "content": resp.text[:5000] if resp.text else ""
             }
         return {"url": url, "status": resp.status_code}
     except Exception as e:
-        return {"url": url, "status": "ERROR", "error": str(e)[:50]}
+        return {"url": url, "status": "ERROR", "error": str(e)[:100]}
 
 async def discover_card(session, set_code: str, card_number: str, name_jp: str, doc_id: str) -> dict:
     """Discover URL + PSA data for a single card."""
