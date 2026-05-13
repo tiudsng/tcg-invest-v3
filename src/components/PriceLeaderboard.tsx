@@ -169,58 +169,29 @@ export const PriceLeaderboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Refactored (2026-05-12): Read from 'rankings' collection which has:
-    // - snkrdunk_id → cross-ref with pokeca_gold for card metadata
-    // - market_data.psa10_price (flattened from pokeca_gold sync)
-    // - name (card display name from SNKRDUNK)
-    // pokeca_gold orderBy('rank') is the authoritative price ranking source
+    // Refactored (2026-05-13): Read from 'leaderboard' collection (SSOT)
+    // leaderboard already has: name, snkrdunk_id, market_data, psa_data, image_url
+    // No cross-ref needed — leaderboard IS the enriched data source
     const q = query(
-      collection(db, 'rankings'),
+      collection(db, 'leaderboard'),
+      orderBy('rank', 'asc'),
       limit(10)
     );
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       console.log(`[PriceLeaderboard] Snapshot received with ${snapshot.docs.length} docs`);
       try {
-        // Get pokeca_gold data for all snkrdunk_ids in parallel
-        const snkrdunkIds = snapshot.docs.map(d => d.data().snkrdunk_id).filter(Boolean);
-        const goldRefs = snkrdunkIds.map(id => db.collection('pokeca_gold').doc(String(id)).get());
-        const goldSnaps = await Promise.all(goldRefs);
-        const goldMap = new Map<string, any>();
-        goldSnaps.forEach((snap, i) => {
-          if (snap.exists) goldMap.set(snkrdunkIds[i], snap.data());
-        });
-
-        let productsData = snapshot.docs.map((rankDoc) => {
-          const rankData = rankDoc.data();
-          const goldData = goldMap.get(rankData.snkrdunk_id) || {};
-          const marketData = cleanMarketData(rankDoc.id, {
-            ...rankData,
-            market_data: goldData.market_data || rankData.market_data || {}
-          });
-
+        let productsData = snapshot.docs.map((doc) => {
+          const data = doc.data();
           return {
-            ...rankData,
-            ...goldData,
-            id: rankDoc.id,
-            name_zh: goldData.name_jp || rankData.name,
-            name_jp: goldData.name_jp,
-            name: goldData.name || rankData.name,
-            set_name: goldData.set_name || '',
-            card_number: goldData.card_number || '',
-            image_url: goldData.img_url,
-            market_data: marketData,
+            ...data,
+            id: doc.id,
+            name_zh: data.name_zh || data.name_jp || data.name,
+            image_url: data.image_url,
+            market_data: data.market_data || {},
+            psa_data: data.psa_data || {},
           } as Product;
         });
-
-        // rankings doc IDs are "rank_01".."rank_10" — extract numeric rank
-        productsData = productsData.filter(a => a.id && /^rank_\d+$/.test(a.id));
-        productsData.sort((a, b) => {
-          const numA = parseInt(a.id.replace('rank_', ''), 10) || 0;
-          const numB = parseInt(b.id.replace('rank_', ''), 10) || 0;
-          return numA - numB;
-        });
-        productsData = productsData.slice(0, 10);
 
         if (productsData.length === 0) {
           setProducts(MOCK_PRODUCTS);
@@ -229,12 +200,12 @@ export const PriceLeaderboard = () => {
         }
         setLoading(false);
       } catch (err) {
-        console.error("Error processing leaderboard data:", err);
+        console.error("[PriceLeaderboard] Error processing leaderboard data:", err);
         setProducts(MOCK_PRODUCTS);
         setLoading(false);
       }
     }, (error) => {
-      console.error("Error fetching leaderboard from leaderboard:", error);
+      console.error("[PriceLeaderboard] Error fetching leaderboard:", error);
       setProducts(MOCK_PRODUCTS);
       setLoading(false);
     });
