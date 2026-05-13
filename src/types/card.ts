@@ -225,12 +225,16 @@ interface RawFirestoreDoc {
 
 /**
  * Normalize a raw Firestore document into a safe, fully-typed CardDoc.
- * 
+ *
  * @param docId - Firestore document ID
  * @param raw - Raw document data from Firestore (any collection)
  * @param sourceCollection - Name of the source collection for tracking
+ * @param debug - Set true to log fallback events (for smoke-test correlation)
  */
-export function normalizeCard(docId: string, raw: RawFirestoreDoc, sourceCollection: string): CardDoc {
+export function normalizeCard(docId: string, raw: RawFirestoreDoc, sourceCollection: string, debug = false): CardDoc {
+  // Fallback event log — useful for smoke-test correlation
+  // Shows which fields triggered defaults and why (write pipeline bug detection)
+  const fallbackEvents: string[] = [];
   
   // ── PSA Population Derivation ──────────────────────────────
   // PSA data can come as populations array or as individual fields
@@ -276,9 +280,12 @@ export function normalizeCard(docId: string, raw: RawFirestoreDoc, sourceCollect
       psaRatioNum = ratioNum;
       psaRatioStr = `${ratioNum}%`;
     }
-  } else if (psa10Count > 0 && totalGraded > 0) {
-    psaRatioNum = Math.round((psa10Count / totalGraded) * 1000) / 10;
-    psaRatioStr = `${psaRatioNum}%`;
+  } else {
+    fallbackEvents.push('psa_ratio: fell back to 0% (rawRatio=' + JSON.stringify(rawRatio) + ')');
+    if (psa10Count > 0 && totalGraded > 0) {
+      psaRatioNum = Math.round((psa10Count / totalGraded) * 1000) / 10;
+      psaRatioStr = `${psaRatioNum}%`;
+    }
   }
 
   // ── Market Price ───────────────────────────────────────────
@@ -297,17 +304,24 @@ export function normalizeCard(docId: string, raw: RawFirestoreDoc, sourceCollect
     } else if (typeof ts === 'number') {
       lastUpdated = new Date(ts * 1000).toISOString();
     }
+  } else {
+    fallbackEvents.push('last_updated: missing timestamp');
   }
 
   // ── Investment Metrics ─────────────────────────────────────
   const investment: InvestmentMetrics = {
-    growth_potential: (raw.growth_potential as any) || '中',
-    holding_advice: (raw.holding_advice as any) || '中期 (1-2年)',
-    holding_score: Number(raw.holding_score) || 50,
+    growth_potential: (raw.growth_potential as any) || (() => { fallbackEvents.push('growth_potential: fell back to 中'); return '中'; })(),
+    holding_advice: (raw.holding_advice as any) || (() => { fallbackEvents.push('holding_advice: fell back to 中期'); return '中期 (1-2年)'; })(),
+    holding_score: Number(raw.holding_score) || (() => { fallbackEvents.push('holding_score: fell back to 50'); return 50; })(),
     liquidity: '中',
     volatility: '中',
-    asset_class: (raw.asset_class as any) || 'LEVEL B',
+    asset_class: (raw.asset_class as any) || (() => { fallbackEvents.push('asset_class: fell back to LEVEL B'); return 'LEVEL B'; })(),
   };
+
+  // ── Debug Log (for smoke-test correlation) ─────────────────
+  if (debug && fallbackEvents.length > 0) {
+    console.warn(`[normalizeCard] ${docId} used ${fallbackEvents.length} fallback(s):`, fallbackEvents);
+  }
 
   return {
     id: docId,

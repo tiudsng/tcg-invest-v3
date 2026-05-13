@@ -159,8 +159,8 @@ def check_doc(doc_id: str, data: dict) -> CheckResult:
         r.checks['internal_inconsistent'] = False
 
     # ── Severity ──────────────────────────────────────────────────────────────
-    # CRITICAL: logic bugs in the write pipeline
-    if r.checks['undefined_string'] or r.checks['psa_ratio_suspicious']:
+    # CRITICAL: logic bugs in the write pipeline (always block deploy)
+    if r.checks['undefined_string']:
         r.severity = 'critical'
     elif r.checks['ratio_out_of_range']:
         r.severity = 'critical'
@@ -168,12 +168,14 @@ def check_doc(doc_id: str, data: dict) -> CheckResult:
         r.severity = 'critical'
     elif r.checks['psa_ratio_missing']:
         r.severity = 'critical'
-    # WARN: data may be correct but unusual
     elif r.checks['price_zero'] and r.checks['zero_population']:
         r.severity = 'critical'
     elif r.checks['psa_ratio_zero']:  # non-zero cards but 0% ratio = broken calc
         r.severity = 'critical'
-    elif r.checks['psa_ratio_zero'] or r.checks['zero_population'] or r.checks['zero_count']:
+    # WARN: unusual but possibly legitimate (false-positive risk — do not block hotfixes)
+    elif r.checks['psa_ratio_suspicious']:   # regex mismatch e.g. '85.3%%'
+        r.severity = 'warn'
+    elif r.checks['zero_population'] or r.checks['zero_count']:
         r.severity = 'warn'
 
     # Track fallback: normalizeCard would fallback if ratio_str is empty or 0%
