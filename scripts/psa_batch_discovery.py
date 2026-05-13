@@ -158,11 +158,13 @@ async def fetch_url(session, url: str) -> dict:
             title_m = re.search(r'<title>([^<]+)</title>', resp.text)
             title = title_m.group(1) if title_m else ""
             psa = extract_psa_data(resp.text)
+            sample = resp.text[:300].replace('\n', ' ')
             return {
                 "url": url,
                 "status": 200,
                 "title": title,
                 "psa": psa,
+                "sample": sample,
             }
         return {"url": url, "status": resp.status_code}
     except Exception as e:
@@ -199,8 +201,9 @@ async def discover_card(session, set_code: str, card_number: str, name_jp: str, 
         if result.get("status") == 200:
             psa = result.get("psa")
             has_psa = bool(psa)
+            sample = result.get("sample", "")[:100].replace('\n', ' ')
             if debug_shown < 2:
-                print(f"    [200] {'PSA✅' if has_psa else 'PSA❌'} {result.get('title','')[:35]}")
+                print(f"    [200] {'PSA✅' if has_psa else 'PSA❌'} {result.get('title','')[:35]} | sample:{sample[:60]}")
                 debug_shown += 1
             
             if has_psa and best is None:
