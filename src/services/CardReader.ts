@@ -1,6 +1,14 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Product } from '../types';
+import { normalizeCard, CardDoc, DEFAULT_MARKET_DATA, DEFAULT_PSA_DATA, DEFAULT_INVESTMENT } from '../types/card';
+
+/**
+ * CardReader — Single Exit Point for all card data reads.
+ * 
+ * All Firestore data MUST pass through normalizeCard() before reaching UI.
+ * This ensures every field has a safe fallback value — no undefined, no "undefined%".
+ */
 
 export class CardReader {
   /**
@@ -101,43 +109,52 @@ export class CardReader {
   }
 
   private static adaptToProduct(id: string, data: any, source: string): Product {
-    // If it already contains market_data, it's mostly structured
-    // Normalize properties
+    // ✅ Use normalizeCard() as single exit point for all data normalization.
+    // This guarantees every field has a safe fallback — no undefined, no "undefined%".
+    const normalized = normalizeCard(id, data, source);
 
-    let snkrdunk_id = data.snkrdunk_id || id.replace('snkrdunk_', '');
-    let card_id = data.card_id || `snkrdunk_${snkrdunk_id}`;
-
-    // Merge market_data: prefer market_data.* fields, but also pull from top-level
-    // and psa_data for leaderboard fallback
-    const psaData = data.psa_data || {};
-    const marketData = data.market_data || {};
-    const mergedMarketData = {
-      ...marketData,
-      // raw_price: prefer market_data.raw_price, fallback to top-level price
-      raw_price: marketData.raw_price ?? (data.price != null ? data.price : 0),
-      // PSA population: prefer market_data fields, fallback to psa_data
-      psa_pop_10: marketData.psa_pop_10 ?? psaData.psa10_count ?? data.psa_pop_10 ?? 0,
-      psa_pop_total: marketData.psa_pop_total ?? psaData.total_graded ?? data.psa_pop_total ?? 0,
-      psa_pop_10_percent: marketData.psa_pop_10_percent ?? psaData.psa10_ratio ?? data.psa_pop_10_percent ?? '',
-      // Ensure snkrdunk_price exists
-      snkrdunk_price: marketData.snkrdunk_price ?? marketData.psa10_price ?? data.price ?? 0,
-      psa10_price: marketData.psa10_price ?? data.price ?? 0,
-      source: marketData.source || source,
-    };
-
+    // Convert CardDoc (new unified type) → Product (legacy UI type).
+    // This adapter layer exists to avoid rewriting ProductDetail.tsx right now.
+    // Long-term: ProductDetail should consume CardDoc directly.
     return {
-      id: id,
-      card_id: card_id,
-      name_zh: data.name_zh || data.name_jp || '',
-      name_jp: data.name_jp || data.name_en || '',
-      name_en: data.name_en || '',
+      id: normalized.id,
+      card_id: normalized.id,
+      rank: 0,
+      name: normalized.name_zh,
+      name_zh: normalized.name_zh,
+      name_hk: normalized.name_zh,
+      name_jp: normalized.name_jp,
+      card_number: normalized.card_number,
+      set_code: normalized.set_code,
       set_name: data.set_name || data.series_info || '',
-      set_code: data.set_code || '',
-      card_number: data.card_number || data.slug || '',
-      image_url: data.img_url || data.image_url || '',
-      market_data: mergedMarketData,
-      collection_name: source,
-      ...data
+      image_url: normalized.image_url,
+      imageUrl: normalized.image_url,
+      market_data: {
+        // UI expects psa_pop_10_percent as string with '%' — normalizeCard guarantees this
+        snkrdunk_price: normalized.market_data.psa10_price,
+        ebay_price: 0,
+        change_24h: normalized.market_data.change_pct,
+        status: 'active',
+        psa10_price: normalized.market_data.psa10_price,
+        raw_price: normalized.market_data.raw_price,
+        snkdunk_price: normalized.market_data.psa10_price,
+        psa_pop_total: normalized.market_data.psa_pop_total,
+        psa_pop_10: normalized.market_data.psa_pop_10,
+        psa10_population: normalized.market_data.psa_pop_10,
+        psa_pop_10_percent: normalized.market_data.psa_pop_10_percent,
+        last_updated: normalized.market_data.last_updated,
+      },
+      analysis_quote: normalized.analysis_quote,
+      data_source: normalized.source_url,
+      collection_name: normalized.collection_name,
+      investment_metrics: {
+        growth_potential: normalized.investment_metrics.growth_potential === '極強' ? 95
+          : normalized.investment_metrics.growth_potential === '強' ? 75
+          : normalized.investment_metrics.growth_potential === '中' ? 50 : 25,
+        holding_advice: normalized.investment_metrics.holding_advice,
+        holding_score: normalized.investment_metrics.holding_score,
+      },
+      updatedAt: normalized.market_data.last_updated,
     } as Product;
   }
 }
