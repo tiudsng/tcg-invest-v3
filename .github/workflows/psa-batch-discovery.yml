@@ -1,0 +1,60 @@
+name: PSA Batch Discovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'Collection to process'
+        required: false
+        default: 'new_products'
+      limit:
+        description: 'Max cards to process'
+        required: false
+        default: '10'
+  repository_dispatch:
+    types: [psa-batch-discovery]
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/psa_batch_discovery.py
+            scripts/psa_url_discovery.py
+            .github/workflows/psa-batch-discovery.yml
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install curl-cffi firebase-admin
+
+      - name: Write Firebase credentials
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > /tmp/firebase-creds.json
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+
+      - name: Update script with creds path
+        run: |
+          # Update the creds path in the script
+          sed -i "s|~/.hermes/firebase/|/tmp/.firebase/|g" scripts/psa_batch_discovery.py
+          mkdir -p /tmp/.firebase
+          cp /tmp/firebase-creds.json /tmp/.firebase/
+
+      - name: Run batch discovery
+        run: |
+          python3 scripts/psa_batch_discovery.py \
+            --source ${{ inputs.source || 'new_products' }} \
+            --limit ${{ inputs.limit || '10' }}
+
+      - name: Upload URL cache
+        uses: actions/upload-artifact@v4
+        with:
+          name: pc-url-cache
+          path: /tmp/pc_url_cache.json
+          retention-days: 30
