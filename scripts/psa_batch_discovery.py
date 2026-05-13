@@ -13,6 +13,7 @@ Usage:
 """
 import asyncio
 import os
+import random
 import re
 import sys
 import time
@@ -145,30 +146,52 @@ def generate_candidates(set_code: str, card_number: str, name_jp: str = "") -> l
     return candidates[:15]
 
 # ── Async HTTP Fetcher ────────────────────────────────────────────────────────
-async def fetch_url(session, url: str) -> dict:
-    """Async fetch a single URL."""
-    try:
-        resp = await session.get(
-            url,
-            headers=HEADERS,
-            impersonate="chrome",
-            timeout=15
-        )
-        if resp.status_code == 200:
-            title_m = re.search(r'<title>([^<]+)</title>', resp.text)
-            title = title_m.group(1) if title_m else ""
-            psa = extract_psa_data(resp.text)
-            sample = resp.text[:300].replace('\n', ' ')
-            return {
-                "url": url,
-                "status": 200,
-                "title": title,
-                "psa": psa,
-                "sample": sample,
-            }
-        return {"url": url, "status": resp.status_code}
-    except Exception as e:
-        return {"url": url, "status": "ERROR", "error": str(e)[:100]}
+async def fetch_url(session, url: str, retries: int = 2) -> dict:
+    """Async fetch a single URL with random delay + retry on Cloudflare challenge."""
+    for attempt in range(retries + 1):
+        # Random delay 1-3s between EACH request — the "slow is fast" rule
+        await asyncio.sleep(random.uniform(1.0, 3.0))
+        
+        try:
+            resp = await session.get(
+                url,
+                headers=HEADERS,
+                impersonate="chrome",
+                timeout=15
+            )
+            if resp.status_code == 200:
+                title_m = re.search(r'<title>([^<]+)</title>', resp.text)
+                title = title_m.group(1) if title_m else ""
+                sample = resp.text[:300].replace('\n', ' ')
+                
+                # Check for Cloudflare challenge page
+                if "Just a moment" in resp.text or "Checking your browser" in resp.text:
+                    if attempt < retries:
+                        wait = random.uniform(5, 10)
+                        print(f"    [CF Challenge] Retry {attempt+1}/{retries} after {wait:.1f}s...")
+                        await asyncio.sleep(wait)
+                        continue
+                    return {
+                        "url": url, "status": 200, "title": title,
+                        "psa": None, "sample": sample, "cf_blocked": True
+                    }
+                
+                psa = extract_psa_data(resp.text)
+                return {
+                    "url": url,
+                    "status": 200,
+                    "title": title,
+                    "psa": psa,
+                    "sample": sample,
+                }
+            return {"url": url, "status": resp.status_code}
+        except Exception as e:
+            if attempt < retries:
+                await asyncio.sleep(random.uniform(2, 5))
+                continue
+            return {"url": url, "status": "ERROR", "error": str(e)[:100]}
+    
+    return {"url": url, "status": "EXHAUSTED"}
 
 async def discover_card(session, set_code: str, card_number: str, name_jp: str, doc_id: str) -> dict:
     """Discover URL + PSA data for a single card."""
@@ -305,10 +328,12 @@ async def main(source: str = "new_products", limit: int = 100):
     
     connector = curl_requests.AsyncSession()
     
-    semaphore = asyncio.Semaphore(5)  # Max 5 concurrent requests
+    semaphore = asyncio.Semaphore(1)  # Sequential — slowest but most stealthy
     
     async def bounded_process(doc_id, doc_data):
         async with semaphore:
+            # Random delay 1-3s to avoid bot detection patterns
+            await asyncio.sleep(random.uniform(1.0, 3.0))
             return await process_card(connector, doc_data, doc_id)
     
     tasks = [bounded_process(doc_id, data) for doc_id, data in cards]
