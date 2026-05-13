@@ -16,12 +16,14 @@ import os
 import re
 import sys
 import time
-import json
+import json as json_module
 from pathlib import Path
 from typing import Optional
 
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials
+from google.cloud import firestore
+from google.oauth2 import service_account
 from curl_cffi import requests as curl_requests
 
 # ── Config ──────────────────────────────────────────────────────────────────
@@ -40,20 +42,21 @@ HEADERS = {
 
 # ── Firebase Init ────────────────────────────────────────────────────────────
 def init_firebase():
-    try:
-        app = firebase_admin.get_app()
-    except ValueError:
-        cred_dict = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
-        if cred_dict:
-            import json as json_module
-            cred = credentials.Certificate(json_module.loads(cred_dict))
-        else:
-            cred = credentials.Certificate(str(FIREBASE_CRED_PATH))
-        app = firebase_admin.initialize_app(cred, {
-            'projectId': PROJECT_ID,
-            'databaseId': FIRESTORE_DB
-        })
-    return firestore.client(app)
+    """Initialize Firestore client using google.cloud.firestore.Client directly."""
+    creds_dict_str = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
+    if creds_dict_str:
+        creds_dict = json_module.loads(creds_dict_str)
+        creds = service_account.Credentials.from_service_account_info(creds_dict)
+    else:
+        creds_dict = json_module.loads(Path(FIREBASE_CRED_PATH).read_text())
+        creds = service_account.Credentials.from_service_account_info(creds_dict)
+    
+    client = firestore.Client(
+        credentials=creds,
+        project=PROJECT_ID,
+        database=FIRESTORE_DB
+    )
+    return client
 
 db = init_firebase()
 
@@ -62,11 +65,11 @@ CACHE_FILE = Path("/tmp/pc_url_cache.json")
 
 def load_cache() -> dict:
     if CACHE_FILE.exists():
-        return json.loads(CACHE_FILE.read_text())
+        return json_module.loads(CACHE_FILE.read_text())
     return {}
 
 def save_cache(cache: dict):
-    CACHE_FILE.write_text(json.dumps(cache, ensure_ascii=False, indent=2))
+    CACHE_FILE.write_text(json_module.dumps(cache, ensure_ascii=False, indent=2))
 
 # ── PSA Extraction ───────────────────────────────────────────────────────────
 def extract_psa_data(html: str) -> Optional[dict]:
