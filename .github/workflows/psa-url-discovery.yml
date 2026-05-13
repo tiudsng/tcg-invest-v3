@@ -7,6 +7,8 @@ on:
         description: 'Card set_code/card_number (e.g. sm11_097)'
         required: false
         default: 'sm11_097'
+  repository_dispatch:
+    types: [psa-url-discovery]
 
 jobs:
   discover:

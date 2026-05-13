@@ -20,7 +20,7 @@ const db = new Firestore({
   databaseId: 'ai-studio-507f7bd1-f48e-48fd-940f-92d962f6658b'
 });
 
-const JPY_TO_HKD = 0.049815;
+const JPY_TO_HKD = 0.052;
 const POKECA_API_BASE = 'https://pokeca-chart.com/ch/php';
 const BATCH_SIZE = 30;       // concurrent API calls
 const WRITE_BATCH = 50;      // Firestore batch write size
