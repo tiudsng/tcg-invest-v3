@@ -183,26 +183,36 @@ async def discover_card(session, set_code: str, card_number: str, name_jp: str, 
     candidates = generate_candidates(set_code, card_number, name_jp)
     
     # Try each candidate concurrently
+    print(f"  [{cache_key}] Trying {len(candidates)} candidates...")
     tasks = [fetch_url(session, url) for url, _ in candidates]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     
     # Find first working URL with PSA data
     best = None
+    debug_shown = 0
     for (url, slug), result in zip(candidates, results):
         if isinstance(result, Exception):
+            if debug_shown < 2:
+                print(f"    [E] {type(result).__name__}: {str(result)[:60]}")
+                debug_shown += 1
             continue
-        if result.get("status") == 200 and result.get("psa"):
-            best = {
-                "pc_url": result["url"],
-                "pc_title": result["title"],
-                "psa_data": result["psa"],
-                "status": "verified"
-            }
-            print(f"  [{cache_key}] ✅ {result['title'][:40]} | PSA10={result['psa']['psa10']} Gem={result['psa']['gem_mt_rate']}%")
-            break
-        elif result.get("status") == 200 and not result.get("psa"):
-            # URL works but no PSA - still a valid URL
-            if best is None:
+        if result.get("status") == 200:
+            psa = result.get("psa")
+            has_psa = bool(psa)
+            if debug_shown < 2:
+                print(f"    [200] {'PSA✅' if has_psa else 'PSA❌'} {result.get('title','')[:35]}")
+                debug_shown += 1
+            
+            if has_psa and best is None:
+                best = {
+                    "pc_url": result["url"],
+                    "pc_title": result["title"],
+                    "psa_data": psa,
+                    "status": "verified"
+                }
+                print(f"  [{cache_key}] ✅ {result['title'][:40]} | PSA10={psa['psa10']} Gem={psa['gem_mt_rate']}%")
+                break
+            elif has_psa is False and best is None:
                 best = {
                     "pc_url": result["url"],
                     "pc_title": result["title"],
@@ -211,7 +221,6 @@ async def discover_card(session, set_code: str, card_number: str, name_jp: str, 
                 }
     
     if best is None:
-        # All candidates failed
         print(f"  [{cache_key}] ❌ No working URL found")
         best = {"status": "not_found", "psa_data": None}
     
