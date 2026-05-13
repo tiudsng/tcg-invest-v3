@@ -207,7 +207,13 @@ export const ProductDetail = () => {
                 </h3>
                 <div className="flex flex-wrap items-center gap-2 mt-1">
                   <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                    Last Updated: {product.market_data?.last_updated ? new Date(product.market_data.last_updated).toLocaleString() : 'Just Now'}
+                    Last Updated: {(product.market_data?.last_updated || product.last_updated) ? (() => {
+                      const ts = product.market_data?.last_updated || product.last_updated;
+                      if (!ts) return 'Just Now';
+                      // Handle Firestore Timestamp, Date object, or ISO string
+                      const date = (ts && typeof ts.toDate === 'function') ? ts.toDate() : new Date(ts);
+                      return isNaN(date.getTime()) ? 'Just Now' : date.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    })() : 'Just Now'}
                   </p>
                   {displaySourceUrl && (
                     <div className="flex items-center gap-1.5 px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[9px] font-black text-blue-400 group/source hover:bg-white/10 transition-colors">
@@ -300,8 +306,16 @@ export const ProductDetail = () => {
                 <span className="text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-tight sm:tracking-widest mb-1.5 whitespace-nowrap">PSA 10 比例</span>
                 <span className="text-base sm:text-xl font-black text-purple-400 tracking-tighter">
                   {(() => {
-                    const val = product.market_data?.psa_pop_10_percent || (product as any).psa_pop_10_percent;
-                    return (val && val !== '0%') ? val : '-';
+                    // Try multiple possible field names for PSA10 ratio
+                    const val = product.market_data?.psa_pop_10_percent
+                      || (product as any).psa_pop_10_percent
+                      || (product as any).psa_data?.psa10_ratio
+                      || (product as any).psa_data?.psa10_ratio_percent;
+                    // Handle "undefined%" string from legacy data
+                    if (!val || val === '0%' || val === 'undefined%' || val === 'undefined') return '-';
+                    // If numeric (e.g. 43.8), append %
+                    if (typeof val === 'number') return `${val}%`;
+                    return val;
                   })()}
                 </span>
               </div>
