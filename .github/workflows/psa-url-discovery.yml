@@ -1,0 +1,40 @@
+name: PSA URL Discovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      card_id:
+        description: 'Card set_code/card_number (e.g. sm11_097)'
+        required: false
+        default: 'sm11_097'
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install curl-cffi
+
+      - name: Run URL discovery
+        run: python3 scripts/psa_url_discovery.py
+
+      - name: Upload artifacts
+        if: success()
+        run: |
+          mkdir -p artifacts
+          echo "Discovery complete" > artifacts/result.txt
+          ls -la artifacts/
+
+      - name: Archive artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: psa-discovery-results
+          path: artifacts/
