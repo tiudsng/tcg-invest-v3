@@ -116,6 +116,9 @@ export class CardReader {
     // Convert CardDoc (new unified type) → Product (legacy UI type).
     // This adapter layer exists to avoid rewriting ProductDetail.tsx right now.
     // Long-term: ProductDetail should consume CardDoc directly.
+    const growthNum = normalized.investment_metrics.growth_potential === '極強' ? 95
+      : normalized.investment_metrics.growth_potential === '強' ? 75
+      : normalized.investment_metrics.growth_potential === '中' ? 50 : 25;
     return {
       id: normalized.id,
       card_id: normalized.id,
@@ -148,9 +151,7 @@ export class CardReader {
       data_source: normalized.source_url,
       collection_name: normalized.collection_name,
       investment_metrics: {
-        growth_potential: normalized.investment_metrics.growth_potential === '極強' ? 95
-          : normalized.investment_metrics.growth_potential === '強' ? 75
-          : normalized.investment_metrics.growth_potential === '中' ? 50 : 25,
+        growth_potential: growthNum, // UI checks >= 80 for '極強', so use 95
         holding_advice: normalized.investment_metrics.holding_advice,
         holding_score: normalized.investment_metrics.holding_score,
       },
