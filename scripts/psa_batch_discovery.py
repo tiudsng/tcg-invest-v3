@@ -43,7 +43,12 @@ def init_firebase():
     try:
         app = firebase_admin.get_app()
     except ValueError:
-        cred = credentials.Certificate(str(FIREBASE_CRED_PATH))
+        cred_dict = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
+        if cred_dict:
+            import json as json_module
+            cred = credentials.Certificate(json_module.loads(cred_dict))
+        else:
+            cred = credentials.Certificate(str(FIREBASE_CRED_PATH))
         app = firebase_admin.initialize_app(cred, {
             'projectId': PROJECT_ID,
             'databaseId': FIRESTORE_DB

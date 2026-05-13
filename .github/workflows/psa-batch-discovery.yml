@@ -35,18 +35,16 @@ jobs:
 
       - name: Write Firebase credentials
         run: |
+          mkdir -p /tmp/.firebase
           echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > /tmp/firebase-creds.json
+          # Write to the path the script expects
+          echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > /tmp/.firebase/gen-lang-client-0326385388-firebase-adminsdk.json
         env:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
 
-      - name: Update script with creds path
-        run: |
-          # Update the creds path in the script
-          sed -i "s|~/.hermes/firebase/|/tmp/.firebase/|g" scripts/psa_batch_discovery.py
-          mkdir -p /tmp/.firebase
-          cp /tmp/firebase-creds.json /tmp/.firebase/
-
       - name: Run batch discovery
+        env:
+          FIREBASE_CRED_PATH: /tmp/.firebase/gen-lang-client-0326385388-firebase-adminsdk.json
         run: |
           python3 scripts/psa_batch_discovery.py \
             --source ${{ inputs.source || 'new_products' }} \
