@@ -145,37 +145,52 @@ def generate_candidates(set_code: str, card_number: str, name_jp: str = "") -> l
     
     return candidates[:15]
 
+# ── Browser Fingerprint Pool (rotating to avoid JA3 detection) ─────────────────
+BROWSER_FINGERPRINTS = [
+    "chrome120",
+    "chrome119",
+    "chrome116",
+    "safari15_5",
+    "safari16_0",
+    "edge101",
+    "edge102",
+    "firefox110",
+    "firefox109",
+]
+
 # ── Async HTTP Fetcher ────────────────────────────────────────────────────────
-async def fetch_url(session, url: str, retries: int = 2) -> dict:
-    """Async fetch a single URL with random delay + retry on Cloudflare challenge."""
-    for attempt in range(retries + 1):
-        # Random delay 1-3s between EACH request — the "slow is fast" rule
+async def fetch_url(session, url: str, retries: int = 3) -> dict:
+    """Async fetch with fingerprint rotation + Cloudflare retry logic."""
+    fingerprint_history = []
+
+    for attempt in range(retries):
+        # Pick a random fingerprint (avoid repeating the last one)
+        available = [f for f in BROWSER_FINGERPRINTS if f not in fingerprint_history[-2:]]
+        fingerprint = random.choice(available) if available else random.choice(BROWSER_FINGERPRINTS)
+        fingerprint_history.append(fingerprint)
+
+        # Random delay 1-3s between each attempt
         await asyncio.sleep(random.uniform(1.0, 3.0))
-        
+
         try:
             resp = await session.get(
                 url,
                 headers=HEADERS,
-                impersonate="chrome",
+                impersonate=fingerprint,
                 timeout=15
             )
             if resp.status_code == 200:
                 title_m = re.search(r'<title>([^<]+)</title>', resp.text)
                 title = title_m.group(1) if title_m else ""
                 sample = resp.text[:300].replace('\n', ' ')
-                
+
                 # Check for Cloudflare challenge page
                 if "Just a moment" in resp.text or "Checking your browser" in resp.text:
-                    if attempt < retries:
-                        wait = random.uniform(5, 10)
-                        print(f"    [CF Challenge] Retry {attempt+1}/{retries} after {wait:.1f}s...")
-                        await asyncio.sleep(wait)
-                        continue
-                    return {
-                        "url": url, "status": 200, "title": title,
-                        "psa": None, "sample": sample, "cf_blocked": True
-                    }
-                
+                    wait = random.uniform(5, 12)
+                    print(f"    [CF:{fingerprint}] Attempt {attempt+1}/{retries} blocked, retry after {wait:.1f}s...")
+                    await asyncio.sleep(wait)
+                    continue
+
                 psa = extract_psa_data(resp.text)
                 return {
                     "url": url,
@@ -183,14 +198,15 @@ async def fetch_url(session, url: str, retries: int = 2) -> dict:
                     "title": title,
                     "psa": psa,
                     "sample": sample,
+                    "fingerprint": fingerprint,
                 }
             return {"url": url, "status": resp.status_code}
         except Exception as e:
-            if attempt < retries:
+            if attempt < retries - 1:
                 await asyncio.sleep(random.uniform(2, 5))
                 continue
             return {"url": url, "status": "ERROR", "error": str(e)[:100]}
-    
+
     return {"url": url, "status": "EXHAUSTED"}
 
 async def discover_card(session, set_code: str, card_number: str, name_jp: str, doc_id: str) -> dict:
@@ -332,8 +348,9 @@ async def main(source: str = "new_products", limit: int = 100):
     
     async def bounded_process(doc_id, doc_data):
         async with semaphore:
-            # Random delay 1-3s to avoid bot detection patterns
-            await asyncio.sleep(random.uniform(1.0, 3.0))
+            # fetch_url already has random 1-3s delay per attempt built-in
+            # extra 0.5-1.5s here adds human-like jitter between cards
+            await asyncio.sleep(random.uniform(0.5, 1.5))
             return await process_card(connector, doc_data, doc_id)
     
     tasks = [bounded_process(doc_id, data) for doc_id, data in cards]
