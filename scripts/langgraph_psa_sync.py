@@ -74,6 +74,42 @@ FIRESTORE_PROJECT_ID = "gen-lang-client-0326385388"
 FIRESTORE_DATABASE_ID = "ai-studio-507f7bd1-f48e-48fd-940f-92d962f6658b"
 
 # ============================================================
+# Decision Parser (P1.6 Extended Decisions)
+# ============================================================
+def parse_decision(decision_str: str) -> dict:
+    """
+    拆解 decision 字串格式（Extended Decisions）：
+    - "OVERRIDE"           → {decision: "OVERRIDE", context: {}}
+    - "OVERRIDE:1500"      → {decision: "OVERRIDE", context: {correct_price: 1500}}
+    - "RETRY"              → {decision: "RETRY", context: {}}
+    - "RETRY:HINT:id_123"  → {decision: "RETRY", context: {hint: "id_123"}}
+    - "IGNORE"             → {decision: "IGNORE", context: {}}
+
+    用途：人類可以透過 Telegram InlineKeyboard + 擴展格式，
+    直接附帶正確價格或 Engineer hint，实现 100% 精準干預。
+    """
+    if not decision_str:
+        return {"decision": None, "context": {}, "error": "empty decision"}
+
+    parts = decision_str.split(":")
+    decision = parts[0].strip().upper()
+
+    context = {}
+    if decision == "OVERRIDE" and len(parts) > 1:
+        try:
+            context["correct_price"] = float(parts[1])
+        except ValueError:
+            context["correct_price_raw"] = parts[1]
+    elif decision == "RETRY" and len(parts) > 1:
+        if parts[1].upper() == "HINT" and len(parts) > 2:
+            context["hint"] = parts[2]
+        else:
+            context["retry_context"] = ":".join(parts[1:])
+
+    return {"decision": decision, "context": context}
+
+
+# ============================================================
 # P0: Initialize FirestoreSaver
 # ============================================================
 def get_checkpointer():
@@ -187,6 +223,8 @@ CTO 附加條件：
 3. 遵守 5秒/請求 頻率限制
 4. 實作數據校驗邏輯
 5. 執行 /verify（npm run build + lint）
+
+{# P1.6: 如果有 engineer_hint，强制使用該 ID #}
 
 📊 StateSchema v3 必須填寫：
 - confidence_metrics（你自己評估今次代碼嘅信心，0.0-1.0）
@@ -533,6 +571,12 @@ def engineer_node(state: TCGInvestState) -> Command:
     print(f"  📦 CTO Conditions: {cto_conditions}")
     print(f"  🔄 Retry Count: {retry_count}/{max_retries}")
     print(f"  ☠️  High Risk Op: {is_high_risk}")
+
+    # P1.6: Engineer Hint — 人類可以透過 RETRY:HINT:id_123 强制 Engineer 使用特定 ID
+    engineer_hint = state.get("engineer_hint")
+    if engineer_hint:
+        print(f"  🔍 Engineer Hint detected: {engineer_hint}")
+        print(f"     → Engineer 會强制使用此 ID 進行查詢")
 
     if check_loop_limit(state):
         return Command(goto=END, update={
@@ -1115,13 +1159,36 @@ if __name__ == "__main__":
     # P1: 檢查是否需要恢復（resume with decision）
     if args.decision:
         print(f"\n🎯 P1: Resume with human decision: {args.decision}")
+
+        # P1.6: 解析 extended decision 格式
+        parsed = parse_decision(args.decision)
+        decision = parsed["decision"]
+        ctx = parsed["context"]
+        print(f"   📋 Parsed: decision={decision}, context={ctx}")
+
+        # 構建帶有 context 的 resume update
+        resume_update = {
+            "needs_human_review": False,
+            "human_decision": decision,
+        }
+
+        # OVERRIDE:1500 → 直接用正確價格更新 disputed_data
+        if decision == "OVERRIDE" and "correct_price" in ctx:
+            resume_update["disputed_data"] = {"correct_price": ctx["correct_price"]}
+            print(f"   ✅ OVERRIDE with correct_price={ctx['correct_price']}")
+
+        # RETRY:HINT:id_123 → 將 hint 傳給 Engineer
+        if decision == "RETRY" and "hint" in ctx:
+            resume_update["engineer_hint"] = ctx["hint"]
+            print(f"   🔄 RETRY with hint={ctx['hint']} (Engineer 會強制使用此 ID)")
+
         from langgraph.types import Command
         config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": "psa-sync"}}
 
         graph = build_psa_sync_graph(checkpointer=checkpointer)
 
         async def resume_stream():
-            async for event in graph.astream(Command(resume=args.decision), config=config, stream_mode="values"):
+            async for event in graph.astream(Command(resume=args.decision, update=resume_update), config=config, stream_mode="values"):
                 next_agent = event.get("next_agent", "?")
                 completed = event.get("completed", False)
                 cost = event.get("api_quota", {}).get("cost_today_usd", 0)
