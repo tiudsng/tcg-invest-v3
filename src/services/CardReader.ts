@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Product } from '../types';
 import { normalizeCard, CardDoc, DEFAULT_MARKET_DATA, DEFAULT_PSA_DATA, DEFAULT_INVESTMENT } from '../types/card';
@@ -16,8 +16,16 @@ export class CardReader {
    * Also triggers any updates if needed.
    */
   static async getCard(id: string): Promise<Product | null> {
-    const rawId = id.replace('snkrdunk_', '');
-    const snkrId = id.startsWith('snkrdunk_') ? id : `snkrdunk_${id}`;
+    // ── Normalize ID ─────────────────────────────────────
+    let rawId = id;
+    let snkrId = id.startsWith('snkrdunk_') ? id : `snkrdunk_${id}`;
+    // Handle pokeca_gold_XXXXX prefix (e.g. pokeca_gold_91606 → rawId=91606)
+    if (id.startsWith('pokeca_gold_')) {
+      rawId = id.replace('pokeca_gold_', '');
+      snkrId = id; // will fail collections, fallback to numeric below
+    } else {
+      rawId = id.replace('snkrdunk_', '');
+    }
 
     // Handle rank_XX format — query leaderboard directly, then resolve card_id
     if (/^rank_\d+$/.test(id)) {
@@ -55,12 +63,21 @@ export class CardReader {
     }
     
     // 2. Try leaderboard using snkrdunk_<id> if it's snkrdunk ID
+    // Try both: direct doc ID, and query by snkrdunk_id field
     if (!cardData) {
       const lbRef = doc(db, 'leaderboard', snkrId);
       const lbSnap = await getDoc(lbRef);
       if (lbSnap.exists()) {
         cardData = lbSnap.data();
         source = 'leaderboard';
+      } else {
+        // 🔧 FIX: doc ID may be rank_XX but snkrdunk_id field contains the ID
+        const lbQuery = query(collection(db, 'leaderboard'), where('snkrdunk_id', '==', id));
+        const lbQuerySnap = await getDocs(lbQuery);
+        if (!lbQuerySnap.empty) {
+          cardData = lbQuerySnap.docs[0].data();
+          source = 'leaderboard';
+        }
       }
     }
 
