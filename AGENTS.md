@@ -38,6 +38,11 @@ CEO（Jason）需求 → COO（Hermès規劃）→ CTO（Hermès審核）→ Eng
 
 未經CTO審核，唔准開始寫code。
 
+### Rule: Consult-CTO（最高優先級）
+- **Trigger**: 涉及金錢計算、API 邊界設計、爬蟲頻率調整、數據庫 Schema 變動或任何「不確定」場景
+- **Protocol**: 必須停止自主決策，調用 `/consult-cto` 技能格式化諮詢
+- **Authority**: CTO 的回覆具備最高優先級，方案被否決時必須絕對服從並重新評估
+
 ---
 
 ## 📋 Context Loading（啟動時讀取）

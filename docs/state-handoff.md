@@ -31,6 +31,34 @@
 
 ---
 
+## 🧭 問導師機制（2026-05-14 新增）
+
+### Consult-CTO Rule
+- **觸發**：涉及金錢計算、API 邊界設計、爬蟲頻率調整、數據庫 Schema 變動
+- **Protocol**：必須停止自主決策，調用 `/consult-cto` 技能
+- **Authority**：CTO 回覆具備最高優先級，否決方案必須絕對服從
+
+### Handoff Metadata
+```json
+{
+  "Consultation_Pending": false,
+  "CTO_Decision_Log": [
+    {
+      "timestamp": "2026-05-14",
+      "decision": "...",
+      "context": "..."
+    }
+  ]
+}
+```
+
+### 關鍵決策記錄
+| 日期 | 決策 | 背景 |
+|------|------|------|
+| 2026-05-14 | 固化「問導師」機制 | Jason 要求所有問題先問導師直至最後微調 |
+
+---
+
 ## 🔄 待處理任務
 
 ### 高優先級
