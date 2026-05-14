@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "start": "node index.js",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --outfile=dist/server.js --packages=external",
@@ -10,6 +13,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist build",
     "lint": "tsc --noEmit",
+    "preinstall": "rm -rf node_modules",
+    "install": "npm install --legacy-peer-deps --force",
     "update-images": "tsx scripts/updatePokellectorImages.ts",
     "sync:s": "node scripts/scraper_snkrdunk.cjs",
     "sync:pokeca": "node scripts/scraper_pokeca.cjs"
@@ -55,6 +60,7 @@
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.27.4",
+    "firebase-tools": "^15.18.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "tailwindcss": "^4.1.14",

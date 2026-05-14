@@ -19,6 +19,26 @@ const getServiceAccount = () => {
   return JSON.parse(fs.readFileSync('./firebase-admin-sa.json', 'utf8'));
 };
 
+// ─── Firebase Public Config (Client-Side Init) ─────────────────────────────────
+// GET /api/config
+// Returns Firebase client config for前端 initialization.
+// Frontend reads this instead of hardcoding firebase-applet-config.json.
+app.get('/api/config', (req, res) => {
+  res.json({
+    firebase: {
+      apiKey:            process.env.VITE_FIREBASE_API_KEY || 'AIzaSyDSwhKXm7KqaHVO2kb2PQ6qmarySPcZyJ0',
+      authDomain:        process.env.VITE_FIREBASE_AUTH_DOMAIN || 'gen-lang-client-0326385388.firebaseapp.com',
+      projectId:         process.env.VITE_FIREBASE_PROJECT_ID || 'gen-lang-client-0326385388',
+      storageBucket:     process.env.VITE_FIREBASE_STORAGE_BUCKET || 'gen-lang-client-0326385388.firebasestorage.app',
+      messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '122336191579',
+      appId:             process.env.VITE_FIREBASE_APP_ID || '1:122336191579:web:2de07c0acb51b8b24c8b7e',
+      firestoreDatabaseId: process.env.VITE_FIREBASE_DATABASE_ID || 'ai-studio-507f7bd1-f48e-48fd-940f-92d962f6658b',
+    },
+    status: 'operational',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 const serviceAccount = getServiceAccount();
 
 const app = express();
