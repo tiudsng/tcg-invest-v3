@@ -714,6 +714,76 @@ P1_DEFAULTS = {
     "is_red_retry": False,        # RED tier 强制重试标记
 }
 
+# ── P1.5: Telegram HITL Helper ────────────────────────────────────────────────
+def _notify_tg_hitl(thread_id: str, tier: str, confidence: float, disputed_data: dict):
+    """Send Telegram HITL alert with 3-button InlineKeyboard. Non-blocking."""
+    try:
+        import urllib.request, json, os
+
+        bot_token = os.getenv("TG_BOT_TOKEN", "8642765029:AAE3kn8_28mPOlWLC_4xfNs-RtQje9XCOm8")
+        chat_id = int(os.getenv("TG_CHAT_ID", "8217991576"))
+
+        tier_emoji = {"YELLOW": "⚠️", "RED": "🔴"}.get(tier, "⚠️")
+        reason = disputed_data.get("reason", "Low confidence")
+        code_path = disputed_data.get("code_path", "N/A")
+
+        linesep = "━━━━━━━━━━"
+        text_parts = [
+            f"{tier_emoji} <b>Pipeline Interrupted — {tier} TIER</b>",
+            linesep,
+            f"📊 Confidence: <b>{confidence}</b>",
+            f"🧵 Thread: <code>{thread_id}</code>",
+            f"📋 Reason: {reason}",
+            f"📁 Path: <code>{code_path}</code>",
+            linesep,
+            "Choose your action:",
+        ]
+        text = "\n".join(text_parts)
+
+        keyboard = {
+            "inline_keyboard": [[
+                {"text": "✅ OVERRIDE", "callback_data": f"HITL:{thread_id}:OVERRIDE"},
+                {"text": "🔄 RETRY", "callback_data": f"HITL:{thread_id}:RETRY"},
+                {"text": "⏭️ IGNORE", "callback_data": f"HITL:{thread_id}:IGNORE"},
+            ]]
+        }
+
+        payload = json.dumps({
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "reply_markup": keyboard
+        }).encode()
+
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{bot_token}/sendMessage",
+            data=payload,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read())
+            if result.get("ok"):
+                msg_id = result["result"]["message_id"]
+                # Save interrupt state for daemon to read
+                state_path = f"/tmp/hitl_interrupt/{thread_id}.json"
+                os.makedirs("/tmp/hitl_interrupt", exist_ok=True)
+                with open(state_path, "w") as f:
+                    json.dump({
+                        "thread_id": thread_id,
+                        "tier": tier,
+                        "confidence": confidence,
+                        "disputed_data": disputed_data,
+                        "message_id": msg_id,
+                        "created_at": __import__("datetime").datetime.now().isoformat()
+                    }, f)
+                print(f"  📱 Telegram HITL sent (msg_id={msg_id})")
+            else:
+                print(f"  ⚠️ Telegram failed: {result}")
+
+    except Exception as e:
+        print(f"  ⚠️ Telegram notification error: {e}")
+
+
 def cto_verify_node(state: TCGInvestState) -> Command:
     """CTO：最終驗收（P1: HITL 人機協作）"""
     stream_node("CTO Verify", "YELLOW")
@@ -797,8 +867,13 @@ def cto_verify_node(state: TCGInvestState) -> Command:
     print(f"  {'='*60}")
     print(f"\n  ⏸️  Pipeline 暂停，等候人工决策...")
     print(f"  📌 决策: OVERRIDE(=接受) | RETRY(=重試) | IGNORE(=跳過)")
-    print(f"  💡 恢复命令: python3 scripts/langgraph_psa_sync.py --resume {state.get('task_id', 'unknown')}")
+    thread_id = state.get("task_id", "unknown")
+    print(f"  💡 恢复命令: python3 scripts/langgraph_psa_sync.py --resume {thread_id}")
     print()
+
+    # ===== P1.5: Telegram HITL Notification =====
+    # Send Apple-style Bento card alert + 3-button InlineKeyboard
+    _notify_tg_hitl(thread_id, tier, confidence_score, disputed_data)
 
     # Trigger interrupt — 等待人工介入
     human_value = interrupt({
