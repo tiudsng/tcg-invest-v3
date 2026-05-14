@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Product } from './types';
-import { 
-  ArrowLeft, TrendingUp, ExternalLink, LineChart, Activity, ShoppingBag, 
-  AlertCircle, BarChart3, ShieldCheck, Zap, Info, Maximize2, X, Share2, Heart 
+import {
+  ArrowLeft, TrendingUp, ExternalLink, LineChart, Activity, ShoppingBag,
+  AlertCircle, BarChart3, ShieldCheck, Zap, Info, Maximize2, X, Share2, Heart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getHighResImage, handleImageError, getImageClass } from './lib/imageUtils';
@@ -11,6 +11,8 @@ import { FavoriteButton } from './components/FavoriteButton';
 import { cleanMarketData } from './lib/priceUtils';
 import { PriceTrend } from './components/PriceTrend';
 import { CardReader } from "./lib/services/cardReader";
+import { doc, getDoc, collection } from 'firebase/firestore';
+import { db } from './firebase';
 
 const SnkrdunkLogo = ({ className = "" }: { className?: string }) => (
   <div className={`rounded-[4px] bg-gradient-to-br from-[#8C133E] via-[#35154E] to-[#070F35] flex flex-col items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] shrink-0 transition-all ${className}`}>
@@ -33,7 +35,39 @@ export const ProductDetail = () => {
       if (!id) return;
 
       try {
-        const cardData = await CardReader.getCard(id);
+        let cardData = null;
+        let numericId = id;
+
+        // ID resolution: handle snkrdunk_ prefix by looking up leaderboard
+        if (id.startsWith('snkrdunk_')) {
+          // Query leaderboard for the snkrdunk_id to get the numeric pokeca_gold doc ID
+          const leaderboardSnap = await getDoc(doc(db, 'leaderboard', id.replace('snkrdunk_', 'rank_')));
+          if (leaderboardSnap.exists()) {
+            const lbData = leaderboardSnap.data();
+            // The leaderboard doc may have a reference to the pokeca_gold ID
+            // For now, try the numeric ID directly
+            numericId = id.replace('snkrdunk_', '');
+          }
+          cardData = await CardReader.getCard(numericId);
+        } else if (id.startsWith('rank_')) {
+          // rank_XX format: first get snkrdunk_id from leaderboard, then resolve
+          const lbSnap = await getDoc(doc(db, 'leaderboard', id));
+          if (lbSnap.exists()) {
+            const lbData = lbSnap.data() as any;
+            if (lbData.snkrdunk_id) {
+              const snkrdunkId = lbData.snkrdunk_id; // e.g. "snkrdunk_146897"
+              numericId = snkrdunkId.replace('snkrdunk_', '');
+              cardData = await CardReader.getCard(numericId);
+            }
+          }
+          if (!cardData) {
+            // fallback: try direct lookup with rank as card number
+            cardData = await CardReader.getCard(id);
+          }
+        } else {
+          // Direct numeric ID
+          cardData = await CardReader.getCard(id);
+        }
         
         if (cardData) {
           const cleanedMarketData = cleanMarketData(cardData.id, cardData);
@@ -94,7 +128,7 @@ export const ProductDetail = () => {
   const arbPercent = priceA > 0 ? ((arbSpace / Math.min(priceA, priceB)) * 100).toFixed(1) : '0';
 
   const pokecaUrl = (product as any).pokeca_url || (product.data_source?.includes('pokeca-chart') ? product.data_source : null);
-  const snkrdunkId = product.id?.startsWith('snkrdunk_') ? product.id.replace('snkrdunk_', '') : null;
+  const snkrdunkId = product.card_id?.startsWith('snkrdunk_') ? product.card_id.replace('snkrdunk_', '') : null;
   const snkrdunkUrl = snkrdunkId ? `https://snkrdunk.com/apparels/${snkrdunkId}` : null;
   
   const displaySourceUrl = pokecaUrl || snkrdunkUrl || product.data_source;

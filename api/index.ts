@@ -19,10 +19,16 @@ const getServiceAccount = () => {
   return JSON.parse(fs.readFileSync('./firebase-admin-sa.json', 'utf8'));
 };
 
+const serviceAccount = getServiceAccount();
+
+const app = express();
+
+app.use(cors());
+app.use(express.json({ limit: "50mb" }));
+
 // ─── Firebase Public Config (Client-Side Init) ─────────────────────────────────
 // GET /api/config
 // Returns Firebase client config for前端 initialization.
-// Frontend reads this instead of hardcoding firebase-applet-config.json.
 app.get('/api/config', (req, res) => {
   res.json({
     firebase: {
@@ -38,13 +44,6 @@ app.get('/api/config', (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
-
-const serviceAccount = getServiceAccount();
-
-const app = express();
-
-app.use(cors());
-app.use(express.json({ limit: "50mb" }));
 
 /**
  * Miss Card Search Service (inline)

@@ -243,7 +243,7 @@ export const PriceLeaderboard = () => {
         {/* NO.1 Card */}
         {topCards[0] && (
           <div 
-            onClick={() => navigate(`/product/${topCards[0].id || topCards[0].card_id}`)}
+            onClick={() => navigate(`/product/${topCards[0].card_id}`)}
             className="col-span-2 lg:col-span-1 relative rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden border border-[#d4af37]/60 bg-black flex flex-col shadow-[0_0_20px_rgba(212,175,55,0.15)] cursor-pointer hover:scale-[1.01] transition-transform duration-300"
           >
             {/* Image Section - Matches exact card aspect ratio (63/88) so the whole card fits */}
@@ -300,7 +300,7 @@ export const PriceLeaderboard = () => {
         {topCards.slice(1, 3).map((card, idx) => (
           <div 
             key={card.id || card.card_id} 
-            onClick={() => navigate(`/product/${card.id || card.card_id}`)}
+            onClick={() => navigate(`/product/${card.card_id}`)}
             className="col-span-1 relative rounded-3xl overflow-hidden border border-white/5 bg-black flex flex-col shadow-xl cursor-pointer hover:scale-[1.02] transition-transform duration-300"
           >
             {/* Image Section - Matches exact card aspect ratio */}
@@ -370,7 +370,7 @@ export const PriceLeaderboard = () => {
                     {remainingCards.map((card) => (
                       <div 
                         key={card.id || card.card_id} 
-                        onClick={() => navigate(`/product/${card.id || card.card_id}`)}
+                        onClick={() => navigate(`/product/${card.card_id}`)}
                         className="bg-gray-50 dark:bg-[#1c1c1e] rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#222] transition-colors border border-gray-100 dark:border-transparent"
                       >
                         <div className="w-8 text-gray-400 font-bold text-sm text-center tracking-tighter">
