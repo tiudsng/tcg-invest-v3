@@ -71,6 +71,7 @@ MAX_RETRIES = 3
 BATCH_SIZE = 3
 API_COST_LIMIT_USD = 0.2
 FIRESTORE_PROJECT_ID = "gen-lang-client-0326385388"
+FIRESTORE_DATABASE_ID = "ai-studio-507f7bd1-f48e-48fd-940f-92d962f6658b"
 
 # ============================================================
 # P0: Initialize FirestoreSaver
@@ -80,7 +81,8 @@ def get_checkpointer():
     try:
         saver = FirestoreSaver(
             project_id=FIRESTORE_PROJECT_ID,
-            checkpoints_collection="langgraph_checkpoints"
+            checkpoints_collection="langgraph_checkpoints",
+            database=FIRESTORE_DATABASE_ID
         )
         print(f"✅ FirestoreSaver initialized: project={FIRESTORE_PROJECT_ID}")
         return saver
