@@ -35,40 +35,58 @@ export const ProductDetail = () => {
       if (!id) return;
 
       try {
-        let cardData = null;
-        let numericId = id;
+        let productData = null;
 
-        // ID resolution: handle snkrdunk_ prefix by looking up leaderboard
-        if (id.startsWith('snkrdunk_')) {
-          // Query leaderboard for the snkrdunk_id to get the numeric pokeca_gold doc ID
-          const leaderboardSnap = await getDoc(doc(db, 'leaderboard', id.replace('snkrdunk_', 'rank_')));
-          if (leaderboardSnap.exists()) {
-            const lbData = leaderboardSnap.data();
-            // The leaderboard doc may have a reference to the pokeca_gold ID
-            // For now, try the numeric ID directly
-            numericId = id.replace('snkrdunk_', '');
-          }
-          cardData = await CardReader.getCard(numericId);
-        } else if (id.startsWith('rank_')) {
-          // rank_XX format: first get snkrdunk_id from leaderboard, then resolve
-          const lbSnap = await getDoc(doc(db, 'leaderboard', id));
-          if (lbSnap.exists()) {
-            const lbData = lbSnap.data() as any;
-            if (lbData.snkrdunk_id) {
-              const snkrdunkId = lbData.snkrdunk_id; // e.g. "snkrdunk_146897"
-              numericId = snkrdunkId.replace('snkrdunk_', '');
-              cardData = await CardReader.getCard(numericId);
+        // ID resolution strategy:
+        // 1. snkrdunk_XXXX → leaderboard (by rank_XX) → get snkrdunk_id → build product from leaderboard data
+        // 2. rank_XX → leaderboard direct → get snkrdunk_id
+        // 3. numeric ID → pokeca_gold direct (legacy)
+
+        if (id.startsWith('snkrdunk_') || id.startsWith('rank_')) {
+          // Build the leaderboard doc ID: snkrdunk_146897 → rank_01
+          let leaderboardId = id;
+          if (id.startsWith('snkrdunk_')) {
+            // We need to find the rank. Use leaderboard query to find by snkrdunk_id
+            const { collection, query, where, getDocs } = await import('firebase/firestore');
+            const lbQuery = query(collection(db, 'leaderboard'), where('snkrdunk_id', '==', id));
+            const lbSnap = await getDocs(lbQuery);
+            if (!lbSnap.empty) {
+              const lbDoc = lbSnap.docs[0];
+              productData = { id: lbDoc.id, ...lbDoc.data() } as any;
+            }
+          } else {
+            // rank_XX: direct leaderboard lookup
+            const lbSnap = await getDoc(doc(db, 'leaderboard', id));
+            if (lbSnap.exists()) {
+              productData = { id: lbSnap.id, ...lbSnap.data() } as any;
             }
           }
-          if (!cardData) {
-            // fallback: try direct lookup with rank as card number
-            cardData = await CardReader.getCard(id);
+
+          if (productData) {
+            // Build a Product from leaderboard data
+            // leaderboard has: name_zh, name_jp, snkrdunk_id, image_url, market_data, psa_data
+            const product: Product = {
+              id: productData.snkrdunk_id || id,
+              card_id: productData.snkrdunk_id || id,
+              rank: productData.rank,
+              name_zh: productData.name_zh,
+              name_jp: productData.name_jp,
+              name_hk: productData.name_hk,
+              set_name: productData.set_name,
+              card_number: productData.card_number,
+              image_url: productData.image_url,
+              market_data: productData.market_data || {},
+              psa_data: productData.psa_data || {},
+            };
+            const cleanedMarketData = cleanMarketData(product.id, product);
+            setProduct({ ...product, market_data: cleanedMarketData });
+            setLoading(false);
+            return;
           }
-        } else {
-          // Direct numeric ID
-          cardData = await CardReader.getCard(id);
         }
-        
+
+        // Fallback: try CardReader (pokeca_gold direct)
+        const cardData = await CardReader.getCard(id);
         if (cardData) {
           const cleanedMarketData = cleanMarketData(cardData.id, cardData);
           setProduct({
