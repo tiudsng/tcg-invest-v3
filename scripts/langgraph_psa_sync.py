@@ -700,8 +700,10 @@ def cto_deep_review_node(state: TCGInvestState) -> Command:
     })
 
 
-# P1: HITL 閾值 — 當 confidence 低於此值，觸發人工審查
-HITL_CONFIDENCE_THRESHOLD = 0.7
+# P1: HITL 閾值 — 階梯式信心度策略
+HITL_CONFIDENCE_GREEN = 0.85   # > 0.85: 自動通過
+HITL_CONFIDENCE_YELLOW = 0.50  # 0.5-0.85: 觸發 HITL
+# < 0.5: RED — 強制的 RETRY 一次，再失敗先叫人工
 
 # P1 state fields defaults
 P1_DEFAULTS = {
@@ -709,6 +711,7 @@ P1_DEFAULTS = {
     "human_decision": None,
     "interrupt_reason": None,
     "disputed_data": None,
+    "is_red_retry": False,        # RED tier 强制重试标记
 }
 
 def cto_verify_node(state: TCGInvestState) -> Command:
@@ -742,67 +745,106 @@ def cto_verify_node(state: TCGInvestState) -> Command:
             "audit_trail": add_audit(state, "CTO_Verify", "RETRY", "verification failed")
         })
 
-    # ===== P1: Human-in-the-Loop Check =====
-    # 如果 confidence 低於閾值，觸發 interrupt 等待人工决策
-    if confidence_score < HITL_CONFIDENCE_THRESHOLD:
-        disputed_data = {
-            "confidence_score": confidence_score,
-            "is_high_risk_op": conf_metrics.get("is_high_risk_op", False),
-            "code_path": code_path,
-            "reason": f"Confidence {confidence_score} < {HITL_CONFIDENCE_THRESHOLD}"
-        }
-        print(f"\n  {'='*60}")
-        print(f"  🛑 P1: HITL 觸發！Confidence={confidence_score} < {HITL_CONFIDENCE_THRESHOLD}")
-        print(f"  📋 爭議數據: {disputed_data}")
-        print(f"  {'='*60}")
-        print(f"\n  ⏸️  Pipeline 暂停，等候人工决策...")
-        print(f"  📌 可用决策: OVERRIDE | RETRY | IGNORE")
-        print(f"  💡 恢复命令: python3 scripts/langgraph_psa_sync.py --resume {state.get('task_id', 'unknown')}")
-        print()
-
-        # Trigger interrupt — 等待人工介入
-        human_value = interrupt({
-            "reason": f"Confidence {confidence_score} below threshold {HITL_CONFIDENCE_THRESHOLD}",
-            "disputed_data": disputed_data,
-            "task_id": state.get("task_id"),
-            "available_decisions": ["OVERRIDE", "RETRY", "IGNORE"]
+    # ===== P1: 階梯式 Human-in-the-Loop Check =====
+    # TIER 1 — GREEN (Auto Pass)
+    if confidence_score >= HITL_CONFIDENCE_GREEN:
+        print(f"\n  ✅ GREEN LIGHT — Confidence {confidence_score} >= {HITL_CONFIDENCE_GREEN}，自動通過")
+        print(f"  🎉 CTO 驗收通過！")
+        print(f"  💸 Total API Cost: ${state.get('api_quota', {}).get('cost_today_usd', 0):.3f}")
+        print(f"  🔄 Total Loops: {retry_count}")
+        return Command(goto=END, update={
+            "completed": True, "cto_approved": True, "next_agent": None,
+            "needs_human_review": False, "human_decision": "AUTO_GREEN",
+            "audit_trail": add_audit(state, "CTO_Verify", "AUTO_PASS", f"confidence={confidence_score} >= GREEN")
         })
 
-        # 人工程序執行完成後，繼續處理
-        print(f"\n  ✅ 人類决策: {human_value}")
-
-        # 根據人工决策更新狀態
-        if human_value == "OVERRIDE":
-            return Command(goto=END, update={
-                "completed": True,
-                "cto_approved": True,
-                "human_decision": "OVERRIDE",
-                "needs_human_review": True,
-                "interrupt_reason": None,
-                "next_agent": None,
-                "audit_trail": add_audit(state, "CTO_Verify", "OVERRIDE", f"Confidence {confidence_score} overridden by human")
-            })
-        elif human_value == "IGNORE":
-            return Command(goto=END, update={
-                "completed": True,
-                "cto_approved": False,
-                "human_decision": "IGNORE",
-                "needs_human_review": True,
-                "interrupt_reason": None,
-                "next_agent": None,
-                "audit_trail": add_audit(state, "CTO_Verify", "IGNORE", f"Human ignored low confidence {confidence_score}")
-            })
-        else:  # RETRY
-            loop_entry = {"from": "CTO_Verify", "to": "Engineer", "count": retry_count + 1, "reason": f"human retry: confidence={confidence_score}"}
+    # TIER 2 — YELLOW (HITL Interrupt)
+    if confidence_score >= HITL_CONFIDENCE_YELLOW:
+        tier = "YELLOW"; tier_label = "⚠️  需要人工審查"
+    # TIER 3 — RED (< 0.5): Auto Retry once
+    else:
+        if not state.get("is_red_retry"):
+            # First RED encounter: auto retry
+            print(f"\n  🔴 RED LIGHT — Confidence {confidence_score} < {HITL_CONFIDENCE_YELLOW}")
+            print(f"  ↩️  自動重試一次（RED tier 強制）")
+            loop_entry = {"from": "CTO_Verify", "to": "Engineer", "count": retry_count + 1,
+                          "reason": f"RED auto-retry: confidence={confidence_score}"}
             return Command(goto="engineer", update={
                 "engineer_retry_count": retry_count + 1,
                 "loop_history": loop_history + [loop_entry],
                 "next_agent": "Engineer",
-                "human_decision": "RETRY",
-                "needs_human_review": True,
-                "interrupt_reason": None,
-                "audit_trail": add_audit(state, "CTO_Verify", "RETRY", f"Human requested retry: confidence={confidence_score}")
+                "is_red_retry": True,   # 標記第二次機會
+                "interrupt_reason": f"RED tier retry — confidence={confidence_score}",
+                "audit_trail": add_audit(state, "CTO_Verify", "RED_AUTO_RETRY", f"confidence={confidence_score}")
             })
+        else:
+            # Second RED failure: trigger HITL
+            tier = "RED"; tier_label = "🔴 二次失敗，需要人工介入"
+
+    # YELLOW or second RED: trigger interrupt
+    disputed_data = {
+        "tier": tier,
+        "confidence_score": confidence_score,
+        "is_high_risk_op": conf_metrics.get("is_high_risk_op", False),
+        "code_path": code_path,
+        "reason": f"[{tier}] Confidence {confidence_score} — {tier_label}",
+        "is_red_retry": state.get("is_red_retry", False)
+    }
+    print(f"\n  {'='*60}")
+    print(f"  🛑 P1: HITL 觸發！[{tier}] Confidence={confidence_score}")
+    print(f"  {tier_label}")
+    print(f"  📋 爭議數據: {disputed_data}")
+    print(f"  {'='*60}")
+    print(f"\n  ⏸️  Pipeline 暂停，等候人工决策...")
+    print(f"  📌 决策: OVERRIDE(=接受) | RETRY(=重試) | IGNORE(=跳過)")
+    print(f"  💡 恢复命令: python3 scripts/langgraph_psa_sync.py --resume {state.get('task_id', 'unknown')}")
+    print()
+
+    # Trigger interrupt — 等待人工介入
+    human_value = interrupt({
+        "tier": tier,
+        "reason": f"[{tier}] Confidence {confidence_score} below threshold",
+        "disputed_data": disputed_data,
+        "task_id": state.get("task_id"),
+        "available_decisions": ["OVERRIDE", "RETRY", "IGNORE"]
+    })
+
+    # 人工程序執行完成後，繼續處理
+    print(f"\n  ✅ 人類决策: {human_value}")
+
+    # 根據人工决策更新狀態
+    if human_value == "OVERRIDE":
+        return Command(goto=END, update={
+            "completed": True,
+            "cto_approved": True,
+            "human_decision": f"OVERRIDE_{tier}",
+            "needs_human_review": True,
+            "interrupt_reason": None,
+            "next_agent": None,
+            "audit_trail": add_audit(state, "CTO_Verify", "OVERRIDE", f"[{tier}] Confidence {confidence_score} overridden by human")
+        })
+    elif human_value == "IGNORE":
+        return Command(goto=END, update={
+            "completed": True,
+            "cto_approved": False,
+            "human_decision": f"IGNORE_{tier}",
+            "needs_human_review": True,
+            "interrupt_reason": None,
+            "next_agent": None,
+            "audit_trail": add_audit(state, "CTO_Verify", "IGNORE", f"[{tier}] Human ignored low confidence {confidence_score}")
+        })
+    else:  # RETRY
+        loop_entry = {"from": "CTO_Verify", "to": "Engineer", "count": retry_count + 1,
+                      "reason": f"[{tier}] human retry: confidence={confidence_score}"}
+        return Command(goto="engineer", update={
+            "engineer_retry_count": retry_count + 1,
+            "loop_history": loop_history + [loop_entry],
+            "next_agent": "Engineer",
+            "human_decision": f"RETRY_{tier}",
+            "needs_human_review": True,
+            "interrupt_reason": None,
+            "audit_trail": add_audit(state, "CTO_Verify", "RETRY", f"[{tier}] Human requested retry: confidence={confidence_score}")
+        })
 
     # Confidence 足夠，正常完成
     print(f"\n{'='*60}")
