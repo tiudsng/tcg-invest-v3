@@ -1,0 +1,59 @@
+name: SNKRDUNK Scraper (Batch Dispatch)
+
+on:
+  repository_dispatch:
+    types: [snkrdunk-batch-scraper]
+
+jobs:
+  scrape-batch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: |
+          pip install playwright
+          playwright install chromium --with-deps
+
+      - name: Receive batch payload
+        id: payload
+        run: |
+          # client_payload is available as environment variable
+          PAYLOAD='${{ toJSON(github.event.client_payload) }}'
+          echo "batch_id=${{ github.event.client_payload.batch_id }}" >> $GITHUB_OUTPUT
+          echo "total_jobs=${{ github.event.client_payload.total_jobs }}" >> $GITHUB_OUTPUT
+          echo "immediate=${{ github.event.client_payload.immediate }}" >> $GITHUB_OUTPUT
+          echo "payload_size=${#PAYLOAD}"
+
+      - name: Write batch job file
+        run: |
+          # Write jobs array to temp file for dispatch script
+          python3 -c "
+import json, os
+payload = ${{ toJSON(github.event.client_payload) }}
+with open('/tmp/batch_job.json', 'w') as f:
+    json.dump(payload, f)
+print(f'Batch {payload.get(\"batch_id\")} written: {len(payload.get(\"jobs\", []))} jobs')
+"
+
+      - name: Run batch scraper
+        env:
+          CALLBACK_BASE: ${{ github.event.client_payload.callback_base }}
+          BATCH_ID: ${{ github.event.client_payload.batch_id }}
+        run: |
+          python scripts/snkdunk_dispatch.py \
+            --batch /tmp/batch_job.json
+
+      - name: Summary
+        run: |
+          echo "## SNKRDUNK Batch Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- Batch ID: ${{ github.event.client_payload.batch_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Jobs: ${{ github.event.client_payload.total_jobs }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Immediate: ${{ github.event.client_payload.immediate }}" >> $GITHUB_STEP_SUMMARY
