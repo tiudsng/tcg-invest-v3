@@ -31,7 +31,7 @@ sys.path.insert(0, '/home/ubuntu/.hermes/skills/langgraph_checkpoint_firestore/s
 # LangGraph
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END
-from langgraph.types import Command
+from langgraph.types import Command, interrupt
 from langgraph.graph.message import add_messages
 
 # FirestoreSaver（P0）
@@ -305,6 +305,12 @@ class TCGInvestState(TypedDict, total=False):
     created_at: str
     completed: bool
     error_message: str | None
+
+    # ===== P1: Human-in-the-Loop (HITL) =====
+    needs_human_review: bool
+    human_decision: str | None  # "OVERRIDE" | "RETRY" | "IGNORE" | None
+    interrupt_reason: str | None
+    disputed_data: dict | None  # 儲存爭議數據（價格、card_id等）
 
 
 # ============================================================
@@ -694,18 +700,32 @@ def cto_deep_review_node(state: TCGInvestState) -> Command:
     })
 
 
+# P1: HITL 閾值 — 當 confidence 低於此值，觸發人工審查
+HITL_CONFIDENCE_THRESHOLD = 0.7
+
+# P1 state fields defaults
+P1_DEFAULTS = {
+    "needs_human_review": False,
+    "human_decision": None,
+    "interrupt_reason": None,
+    "disputed_data": None,
+}
+
 def cto_verify_node(state: TCGInvestState) -> Command:
-    """CTO：最終驗收"""
+    """CTO：最終驗收（P1: HITL 人機協作）"""
     stream_node("CTO Verify", "YELLOW")
 
     verified = state.get("engineer_verified", False)
     code_path = state.get("engineer_code_path", "N/A")
     retry_count = state.get("engineer_retry_count", 0)
     loop_history = state.get("loop_history", [])
+    conf_metrics = state.get("confidence_metrics", {})
+    confidence_score = conf_metrics.get("score", 1.0)
 
     print(f"  ✅ Engineer Verified: {verified}")
     print(f"  📁 Code Path: {code_path}")
     print(f"  🔄 Loop Count: {retry_count}")
+    print(f"  📊 Confidence Score: {confidence_score}")
 
     if check_loop_limit(state):
         return Command(goto=END, update={
@@ -722,16 +742,80 @@ def cto_verify_node(state: TCGInvestState) -> Command:
             "audit_trail": add_audit(state, "CTO_Verify", "RETRY", "verification failed")
         })
 
+    # ===== P1: Human-in-the-Loop Check =====
+    # 如果 confidence 低於閾值，觸發 interrupt 等待人工决策
+    if confidence_score < HITL_CONFIDENCE_THRESHOLD:
+        disputed_data = {
+            "confidence_score": confidence_score,
+            "is_high_risk_op": conf_metrics.get("is_high_risk_op", False),
+            "code_path": code_path,
+            "reason": f"Confidence {confidence_score} < {HITL_CONFIDENCE_THRESHOLD}"
+        }
+        print(f"\n  {'='*60}")
+        print(f"  🛑 P1: HITL 觸發！Confidence={confidence_score} < {HITL_CONFIDENCE_THRESHOLD}")
+        print(f"  📋 爭議數據: {disputed_data}")
+        print(f"  {'='*60}")
+        print(f"\n  ⏸️  Pipeline 暂停，等候人工决策...")
+        print(f"  📌 可用决策: OVERRIDE | RETRY | IGNORE")
+        print(f"  💡 恢复命令: python3 scripts/langgraph_psa_sync.py --resume {state.get('task_id', 'unknown')}")
+        print()
+
+        # Trigger interrupt — 等待人工介入
+        human_value = interrupt({
+            "reason": f"Confidence {confidence_score} below threshold {HITL_CONFIDENCE_THRESHOLD}",
+            "disputed_data": disputed_data,
+            "task_id": state.get("task_id"),
+            "available_decisions": ["OVERRIDE", "RETRY", "IGNORE"]
+        })
+
+        # 人工程序執行完成後，繼續處理
+        print(f"\n  ✅ 人類决策: {human_value}")
+
+        # 根據人工决策更新狀態
+        if human_value == "OVERRIDE":
+            return Command(goto=END, update={
+                "completed": True,
+                "cto_approved": True,
+                "human_decision": "OVERRIDE",
+                "needs_human_review": True,
+                "interrupt_reason": None,
+                "next_agent": None,
+                "audit_trail": add_audit(state, "CTO_Verify", "OVERRIDE", f"Confidence {confidence_score} overridden by human")
+            })
+        elif human_value == "IGNORE":
+            return Command(goto=END, update={
+                "completed": True,
+                "cto_approved": False,
+                "human_decision": "IGNORE",
+                "needs_human_review": True,
+                "interrupt_reason": None,
+                "next_agent": None,
+                "audit_trail": add_audit(state, "CTO_Verify", "IGNORE", f"Human ignored low confidence {confidence_score}")
+            })
+        else:  # RETRY
+            loop_entry = {"from": "CTO_Verify", "to": "Engineer", "count": retry_count + 1, "reason": f"human retry: confidence={confidence_score}"}
+            return Command(goto="engineer", update={
+                "engineer_retry_count": retry_count + 1,
+                "loop_history": loop_history + [loop_entry],
+                "next_agent": "Engineer",
+                "human_decision": "RETRY",
+                "needs_human_review": True,
+                "interrupt_reason": None,
+                "audit_trail": add_audit(state, "CTO_Verify", "RETRY", f"Human requested retry: confidence={confidence_score}")
+            })
+
+    # Confidence 足夠，正常完成
     print(f"\n{'='*60}")
     print(f"🎉 CTO 驗收通過！")
     print(f"{'='*60}")
-    print(f"  📊 Final Confidence: {state.get('confidence_metrics', {}).get('score', 'N/A')}")
+    print(f"  📊 Final Confidence: {confidence_score}")
     print(f"  💸 Total API Cost: ${state.get('api_quota', {}).get('cost_today_usd', 0):.3f}")
     print(f"  🔄 Total Loops: {retry_count}")
     print(f"  📁 Code: {code_path}")
 
     return Command(goto=END, update={
         "completed": True, "cto_approved": True, "next_agent": None,
+        "needs_human_review": False, "human_decision": None,
         "audit_trail": add_audit(state, "CTO_Verify", "APPROVE", "final verification passed")
     })
 
@@ -800,6 +884,43 @@ async def run_with_streaming(graph, initial_state: TCGInvestState, thread_id: st
     return final_state
 
 
+# P1: Helper function for final summary
+def print_final_summary(final_state: dict, thread_id: str):
+    print("\n" + "="*60)
+    print("📊 Pipeline 結果摘要")
+    print("="*60)
+    print(f"  CTO Decision: {final_state.get('cto_decision')}")
+    print(f"  CTO Approved: {final_state.get('cto_approved')}")
+    print(f"  Engineer Verified: {final_state.get('engineer_verified')}")
+    print(f"  Deep Review Passed: {final_state.get('cto_deep_review_passed')}")
+    print(f"  Completed: {final_state.get('completed')}")
+    print(f"  Error: {final_state.get('error_message') or 'None'}")
+    print(f"  Engineer Retry Count: {final_state.get('engineer_retry_count')}")
+    print(f"  💸 Total API Cost: ${final_state.get('api_quota', {}).get('cost_today_usd', 0):.3f}")
+    print(f"  💰 Cost Limit: ${final_state.get('api_quota', {}).get('cost_limit_usd', API_COST_LIMIT_USD):.3f}")
+    print(f"  📈 Final Confidence Score: {final_state.get('confidence_metrics', {}).get('score', 'N/A')}")
+    print(f"  🔄 Loop History: {len(final_state.get('loop_history', []))} entries")
+    print(f"  📝 Audit Trail: {len(final_state.get('audit_trail', []))} entries")
+    print(f"  🛑 P1 HITL: needs_human_review={final_state.get('needs_human_review')}")
+    print(f"  🛑 P1 HITL: human_decision={final_state.get('human_decision')}")
+    print("="*60)
+
+    if final_state.get("completed") and final_state.get("engineer_verified"):
+        print("\n✅ Pipeline 完成！")
+        print(f"\n  📌 Thread ID: {thread_id}")
+        print("\n  下一步：")
+        print("    1. 創建 scripts/update_psa_population.ts")
+        print("    2. 執行 npm run build + lint")
+        print("    3. 設定 GitHub Actions workflow（週更）")
+    elif final_state.get("needs_human_review") and not final_state.get("human_decision"):
+        print("\n⏸️ Pipeline 暂停 — 等待人工决策")
+        print(f"  💡 恢复命令: python3 scripts/langgraph_psa_sync.py --resume {thread_id} --decision <OVERRIDE|RETRY|IGNORE>")
+    elif final_state.get("error_message"):
+        print(f"\n⚠️ Pipeline 錯誤：{final_state['error_message']}")
+    else:
+        print("\n✅ Pipeline 完成")
+
+
 # ============================================================
 # Main Execution
 # ============================================================
@@ -807,6 +928,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PSA Population Sync v3 防彈版 + P0 + P2")
     parser.add_argument("--resume", type=str, help="Resume from thread_id")
     parser.add_argument("--thread", type=str, default=None, help="Thread ID for this run")
+    parser.add_argument("--decision", type=str, default=None,
+                        help="P1 HITL: Human decision to resume (OVERRIDE/RETRY/IGNORE)")
     args = parser.parse_args()
 
     print("\n" + "="*60)
@@ -868,8 +991,41 @@ if __name__ == "__main__":
         "audit_trail": [],
         "next_agent": "COO", "messages": [],
         "created_at": datetime.now().isoformat(),
-        "completed": False, "error_message": None
+        "completed": False, "error_message": None,
+        **P1_DEFAULTS
     }
+
+    # P1: 檢查是否需要恢復（resume with decision）
+    if args.decision:
+        print(f"\n🎯 P1: Resume with human decision: {args.decision}")
+        from langgraph.types import Command
+        config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": "psa-sync"}}
+
+        graph = build_psa_sync_graph(checkpointer=checkpointer)
+
+        async def resume_stream():
+            async for event in graph.astream(Command(resume=args.decision), config=config, stream_mode="values"):
+                next_agent = event.get("next_agent", "?")
+                completed = event.get("completed", False)
+                cost = event.get("api_quota", {}).get("cost_today_usd", 0)
+                conf = event.get("confidence_metrics", {}).get("score", "?")
+                interrupt_in = "__interrupt__" in event
+
+                if interrupt_in:
+                    print(f"\n  ❗ INTERRUPT detected in event")
+                    print(f"  💡 Use --resume <thread_id> --decision <OVERRIDE|RETRY|IGNORE> to continue")
+                    return event
+
+                cyan = "\033[96m"; reset = "\033[0m"
+                print(f"  {cyan}[{next_agent}]{reset} completed={completed} cost=${cost:.3f} conf={conf}")
+                if completed:
+                    return event
+            return None
+
+        result = asyncio.run(resume_stream())
+        final_state = result if isinstance(result, dict) else {}
+        print_final_summary(final_state, thread_id)
+        sys.exit(0)
 
     # P2: Streaming 執行
     try:
@@ -903,40 +1059,9 @@ if __name__ == "__main__":
         result = asyncio.run(run_stream())
 
         # 最終結果
-        print("\n" + "="*60)
-        print("📊 Pipeline 結果摘要")
-        print("="*60)
-
-        # result is the final event dict from streaming
         final_state = result if isinstance(result, dict) else initial_state
 
-        print(f"  CTO Decision: {final_state.get('cto_decision')}")
-        print(f"  CTO Approved: {final_state.get('cto_approved')}")
-        print(f"  Engineer Verified: {final_state.get('engineer_verified')}")
-        print(f"  Deep Review Passed: {final_state.get('cto_deep_review_passed')}")
-        print(f"  Completed: {final_state.get('completed')}")
-        print(f"  Error: {final_state.get('error_message') or 'None'}")
-        print(f"  Engineer Retry Count: {final_state.get('engineer_retry_count')}")
-        print(f"  💸 Total API Cost: ${final_state.get('api_quota', {}).get('cost_today_usd', 0):.3f}")
-        print(f"  💰 Cost Limit: ${final_state.get('api_quota', {}).get('cost_limit_usd', API_COST_LIMIT_USD):.3f}")
-        print(f"  📈 Final Confidence Score: {final_state.get('confidence_metrics', {}).get('score', 'N/A')}")
-        print(f"  🔄 Loop History: {len(final_state.get('loop_history', []))} entries")
-        print(f"  📝 Audit Trail: {len(final_state.get('audit_trail', []))} entries")
-
-        print("="*60)
-
-        if final_state.get("completed") and final_state.get("engineer_verified"):
-            print("\n✅ Pipeline 完成！")
-            print(f"\n  📌 Thread ID for resume: {thread_id}")
-            print("\n  下一步：")
-            print("    1. 創建 scripts/update_psa_population.ts")
-            print("    2. 執行 npm run build + lint")
-            print("    3. 設定 GitHub Actions workflow（週更）")
-        elif final_state.get("error_message"):
-            print(f"\n⚠️ Pipeline 暫停：{final_state['error_message']}")
-            print("  需要 Jason 人工介入")
-        else:
-            print("\n⚠️ Pipeline 未完成，需要人工介入")
+        print_final_summary(final_state, thread_id)
 
     except Exception as e:
         print(f"\n❌ Pipeline 錯誤: {e}")
