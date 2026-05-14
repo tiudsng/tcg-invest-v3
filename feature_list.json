@@ -1,0 +1,73 @@
+{
+  "name": "tcginvest-card-tracker",
+  "version": "1.0.0",
+  "description": "TCG card scraping progress tracker for tcginvest.net",
+  "last_updated": "2026-05-14",
+  "total_cards_target": 500,
+  "data_source": {
+    "snkrdunk": {
+      "url_pattern": "https://snkrdunk.com/card/{id}",
+      "id_type": "snkrdunk_numeric",
+      "scraper": "daily_sync.ts",
+      "schedule": "daily"
+    },
+    "pricecharting": {
+      "url_pattern": "https://www.pricecharting.com/card/pokemon-{id}",
+      "id_type": "pricecharting_slug",
+      "scraper": "pricecharting_scraper.py",
+      "schedule": "weekly",
+      "note": "Requires GitHub Actions Runner IP 172.182.195.86"
+    },
+    "psa_population": {
+      "source": "pricecharting.com",
+      "note": "Cloudflare blocked on CVM, GA runner IP works"
+    }
+  },
+  "collections": {
+    "leaderboard": {
+      "purpose": "SSOT for card details",
+      "fields": ["snkrdunk_id", "name_zh", "name_jp", "name_hk", "set_name", "card_number", "image_url", "market_data", "psa_data", "rank"],
+      "data_status": "active"
+    },
+    "pokeca_gold": {
+      "purpose": "Legacy card metadata",
+      "doc_id_type": "numeric",
+      "data_status": "read_only",
+      "note": "Do not rely on doc ID for lookup, use leaderboard.snkrdunk_id instead"
+    },
+    "new_products": {
+      "purpose": "New product releases",
+      "fields": ["market_data", "psa_data"],
+      "data_status": "active"
+    }
+  },
+  "price_grades": ["PSA10", "PSA9", "A", "B", "C", "D", "RAW"],
+  "exchange_rate": {
+    "jpy_to_hkd": 0.0512,
+    "note": "0.052 is incorrect and causes ~1.5% overvaluation"
+  },
+  "progress": {
+    "leaderboard_synced": 0,
+    "psa_data_populated": 0,
+    "price_history_tracked": 0
+  },
+  "priorities": [
+    {
+      "id": "p1",
+      "description": "Fix PriceTrend chart HTTP 404",
+      "status": "pending",
+      "blocker": "pokeca-chart API requires login"
+    },
+    {
+      "id": "p2",
+      "description": "Unify JPY→HKD rate across all scripts",
+      "status": "pending",
+      "affected_files": 14
+    },
+    {
+      "id": "p3",
+      "description": "Clean up duplicate scraper scripts (97.3% overlap)",
+      "status": "pending"
+    }
+  ]
+}
