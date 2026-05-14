@@ -8,7 +8,18 @@ import { Firestore } from "@google-cloud/firestore";
 import * as fs from "fs";
 import type { DocumentData, Query } from "firebase/firestore";
 
-const serviceAccount = JSON.parse(fs.readFileSync('./firebase-admin-sa.json', 'utf8'));
+// Load SA from environment variable (Vercel) or fallback to local file (local dev)
+// Vercel sets FIREBASE_ADMIN_SA_JSON as encrypted env var — never write to git
+const getServiceAccount = () => {
+  const envSA = process.env.FIREBASE_ADMIN_SA_JSON;
+  if (envSA) {
+    return JSON.parse(envSA);
+  }
+  // Local dev fallback — file gitignored
+  return JSON.parse(fs.readFileSync('./firebase-admin-sa.json', 'utf8'));
+};
+
+const serviceAccount = getServiceAccount();
 
 const app = express();
 
