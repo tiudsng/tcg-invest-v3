@@ -90,11 +90,19 @@ export const cleanMarketData = (cardId: string, data: any) => {
     return 0;
   };
 
-  const psa10Population = parsePopCount(marketData.psa_pop_10 || marketData.psa10_population || data.psa_pop_10 || data.psa10_population);
-  const psaPopTotal = parsePopCount(marketData.psa_pop_total || data.psa_pop_total);
-  
-  // Ensure we have a valid percentage string
-  let psaPop10Percent = marketData.psa_pop_10_percent || data.psa_pop_10_percent;
+  // PSA population: check market_data + data + psa_data (leaderboard uses psa_data.*)
+  const psa10Population = parsePopCount(
+    marketData.psa_pop_10 || marketData.psa10_population ||
+    data.psa_pop_10 || data.psa10_population ||
+    data.psa_data?.psa10_count  // leaderboard psa_data fallback
+  );
+  const psaPopTotal = parsePopCount(
+    marketData.psa_pop_total || data.psa_pop_total ||
+    data.psa_data?.total_graded  // leaderboard psa_data fallback
+  );
+
+  // PSA ratio: check market_data + data + psa_data.psa10_ratio
+  let psaPop10Percent = marketData.psa_pop_10_percent || data.psa_pop_10_percent || data.psa_data?.psa10_ratio;
   if (!psaPop10Percent && psaPopTotal > 0 && psa10Population > 0) {
     psaPop10Percent = `${((psa10Population / psaPopTotal) * 100).toFixed(1)}%`;
   }
