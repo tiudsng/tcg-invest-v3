@@ -114,7 +114,8 @@ export function getHighResImage(url?: string, cardName?: string, setAndNumber?: 
   }
 
   // Pikachu with Grey Felt Hat (Vanish Pikachu - SVP 085)
-  if (name.includes('戴灰') || name.includes('氈帽') || name.includes('梵谷') || (idStr.includes('svp') && idStr.includes('085'))) {
+  // name_zh for rank_01 is '梵高比卡超' (Traditional), not '梵谷' (Simplified)
+  if (name.includes('戴灰') || name.includes('氈帽') || name.includes('梵谷') || name.includes('梵高') || (idStr.includes('svp') && idStr.includes('085'))) {
     return 'https://images.pokemontcg.io/svp/85_hires.png';
   }
 
