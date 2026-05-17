@@ -1,18 +1,14 @@
 {
-  "name": "react-example",
+  "name": "tcg-invest-v3",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --outfile=dist/server.js --packages=external",
-    "dev": "tsx server.ts",
+    "dev": "vite",
+    "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist build",
-    "lint": "tsc --noEmit",
-    "update-images": "tsx scripts/updatePokellectorImages.ts",
-    "sync:s": "node scripts/scraper_snkrdunk.cjs",
-    "sync:pokeca": "node scripts/scraper_pokeca.cjs"
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
