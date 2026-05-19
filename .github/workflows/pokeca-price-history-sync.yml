@@ -1,0 +1,99 @@
+name: Pokeca Price History Sync
+
+on:
+  schedule:
+    # HKT 02:00 = UTC 18:00 (避开高峰期)
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      set_code:
+        description: 'Set code to crawl (default: sv2a)'
+        required: false
+        default: 'sv2a'
+        type: string
+      workers:
+        description: 'Concurrency workers (default: 4)'
+        required: false
+        default: '4'
+        type: number
+      dry_run:
+        description: 'Dry run (no Firestore writes)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  sync_pokeca_price_history:
+    name: Pokeca Price History Crawler
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip -q
+          pip install aiohttp google-cloud-firestore -q
+
+      - name: Write Firebase SA JSON
+        run: |
+          mkdir -p /home/runner/.hermes/firebase
+          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" | base64 -d \
+            > /home/runner/.hermes/firebase/gen-lang-client-0326385388-firebase-adminsdk.json
+
+      - name: Log runner info
+        run: |
+          echo "Runner: $(hostname)"
+          echo "IP: $(curl -s ifconfig.me)"
+          echo "Set: ${{ inputs.set_code || 'sv2a' }}"
+          echo "Workers: ${{ inputs.workers || 4 }}"
+
+      - name: Run crawler
+        env:
+          GCP_PROJECT: gen-lang-client-0326385388
+          FIRESTORE_DB: ai-studio-507f7bd1-f48e-48fd-940f-92d962f6658b
+          SA_JSON: /home/runner/.hermes/firebase/gen-lang-client-0326385388-firebase-adminsdk.json
+        run: |
+          SET_CODE="${{ inputs.set_code || 'sv2a' }}"
+          WORKERS="${{ inputs.workers || 4 }}"
+          DRY_RUN_FLAG=""
+
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+
+          python3 scripts/pokeca_chart_crawler.py \
+            --set "$SET_CODE" \
+            --workers "$WORKERS" \
+            $DRY_RUN_FLAG \
+            2>&1 | tee /tmp/crawler_$SET_CODE.log
+
+      - name: Verify Firestore write
+        if: inputs.dry_run != 'true'
+        run: |
+          sleep 5
+          echo "=== Crawler log tail ==="
+          tail -20 /tmp/crawler_$SET_CODE.log
+
+      - name: Upload crawler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokeca-crawler-log-${{ inputs.set_code || 'sv2a' }}-${{ github.run_number }}
+          path: /tmp/crawler_$SET_CODE.log
+          retention-days: 3
+
+      - name: Post run summary
+        run: |
+          echo "### Pokeca Price History Sync" >> $GITHUB_STEP_SUMMARY
+          echo "- Set: ${{ inputs.set_code || 'sv2a' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Workers: ${{ inputs.workers || 4 }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Dry run: ${{ inputs.dry_run || 'false' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Run time: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
