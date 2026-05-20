@@ -52,42 +52,43 @@ const FeaturedArticle = ({ article, isLarge = false, onEdit }: { article: any, i
   const isAdmin = user?.role === 'admin';
 
   if (isLarge) {
-    // Full-width landscape card: image LEFT 60% | text RIGHT 40%
+    // Large featured card: image LEFT | text RIGHT
+    // Image is a tall portrait card (1290x2796), so use aspect-[3/4] + taller min-height
     return (
-      <div className="group relative flex flex-col sm:flex-row w-full h-full bg-[#0f0f1a] sm:bg-[#131320] rounded-2xl sm:rounded-[1.5rem] overflow-hidden border border-white/10 transition-all duration-300 hover:border-blue-500/30 shadow-lg hover:shadow-2xl hover:-translate-y-1">
+      <div className="group relative flex flex-col sm:flex-row w-full h-full bg-[#0f0f1a] rounded-2xl sm:rounded-[1.5rem] overflow-hidden border border-white/10 transition-all duration-300 hover:border-blue-500/30 shadow-lg hover:-translate-y-1">
         <Link to={`/article/${article.id}`} className="absolute inset-0 z-10" aria-label={`閱讀 ${article.title}`} />
         
-        {/* Image area - left 60% */}
-        <div className="relative w-full sm:w-[60%] aspect-[4/3] sm:aspect-auto sm:h-full min-h-[200px] sm:min-h-[280px] overflow-hidden z-0 bg-[#0a0a15] shrink-0">
+        {/* Image area - left, portrait card so use taller aspect */}
+        <div className="relative w-full sm:w-[58%] aspect-[3/4] sm:aspect-auto sm:h-full min-h-[280px] sm:min-h-[380px] overflow-hidden z-0 bg-[#080810] shrink-0">
           <img 
             src={article.imageUrl} 
             alt={article.title} 
-            className="absolute inset-0 w-full h-full object-contain p-4"
+            className="absolute inset-0 w-full h-full object-contain"
             referrerPolicy="no-referrer"
             loading="lazy"
             decoding="async"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${article.id}/800/500?blur=2`;
+              (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${article.id}/800/600?blur=2`;
             }}
           />
-          {/* Left side gradient */}
-          <div className="hidden sm:block absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#131320]" />
+          {/* Subtle right edge darken for separation */}
+          <div className="hidden sm:block absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-white/5 to-transparent" />
         </div>
 
-        {/* Text area - right 40% */}
-        <div className="flex flex-col justify-center p-5 sm:p-8 z-0 flex-grow bg-[#131320] sm:bg-transparent">
+        {/* Text area - right */}
+        <div className="flex flex-col justify-center p-5 sm:p-7 z-0 flex-grow bg-[#131320] sm:bg-transparent">
           {article.category && (
             <span className="inline-block mb-3 px-3 py-1 bg-blue-600/20 text-blue-400 text-[10px] font-black rounded-full uppercase tracking-widest w-fit">
               {article.category}
             </span>
           )}
-          <h3 className="text-base sm:text-2xl lg:text-3xl font-black tracking-tight text-white leading-tight mb-3 group-hover:text-blue-400 transition-colors line-clamp-3 sm:line-clamp-none">
+          <h3 className="text-base sm:text-xl lg:text-2xl font-black tracking-tight text-white leading-tight mb-3 group-hover:text-blue-400 transition-colors line-clamp-3 sm:line-clamp-none">
             {article.title}
           </h3>
           <p className="hidden sm:block text-sm text-gray-400 leading-relaxed line-clamp-2 mb-4">
             {article.excerpt || '點擊閱讀全文...'}
           </p>
-          <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+          <div className="flex items-center gap-2 text-xs text-gray-500 font-medium mt-auto">
             <Clock className="w-3.5 h-3.5" />
             <span>{article.readTime}</span>
             {article.date && <span>· {article.date}</span>}
