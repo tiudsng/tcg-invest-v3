@@ -576,40 +576,46 @@ export const Home: React.FC = () => {
               [...Array(3)].map((_, i) => <ArticleSkeleton key={i} />)
             ) : (
               <>
+                {(() => {
+                  const getZoneArticle = (zoneId: number, excludeIds: string[] = []) => {
+                    return localArticles
+                      .filter(a => a.zone === zoneId && !excludeIds.includes(a.id))
+                      .sort((a, b) => {
+                        const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+                        const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+                        return timeB - timeA;
+                      })[0];
+                  };
+                  const article1 = getZoneArticle(1);
+                  const article2 = getZoneArticle(2, article1 ? [article1.id] : []);
+                  const article3 = getZoneArticle(3, [article1?.id, article2?.id].filter(Boolean));
+                  return (
+              <>
                 {/* 文章 1 區 (Large Slot) */}
                 <div className="lg:col-span-2 h-full">
-                  {(() => {
-                    const article1 = localArticles.find(a => a.zone === 1) || localArticles[0];
-                    return article1 ? (
+                  {article1 ? (
                       <div className="h-full">
                         <FeaturedArticle article={article1} isLarge onEdit={handleArticleEdit} />
                       </div>
-                    ) : null;
-                  })()}
+                    ) : null}
                 </div>
                 
                 {/* 文章 2 區 & 3 區 (Small Slots) */}
                 <div className="lg:col-span-1 grid grid-cols-2 lg:flex lg:flex-col gap-3 sm:gap-6 h-full">
-                  {(() => {
-                    const article1 = localArticles.find(a => a.zone === 1) || localArticles[0];
-                    const article2 = localArticles.find(a => a.zone === 2 && a.id !== article1?.id) || localArticles.find(a => a.id !== article1?.id);
-                    return article2 ? (
+                  {article2 ? (
                       <div className="flex-1">
                         <FeaturedArticle article={article2} onEdit={handleArticleEdit} />
                       </div>
-                    ) : null;
-                  })()}
-                  {(() => {
-                    const article1 = localArticles.find(a => a.zone === 1) || localArticles[0];
-                    const article2 = localArticles.find(a => a.zone === 2 && a.id !== article1?.id) || localArticles.find(a => a.id !== article1?.id);
-                    const article3 = localArticles.find(a => a.zone === 3 && a.id !== article1?.id && a.id !== article2?.id) || localArticles.find(a => a.id !== article1?.id && a.id !== article2?.id);
-                    return article3 ? (
+                    ) : null}
+                  {article3 ? (
                       <div className="flex-1">
                         <FeaturedArticle article={article3} onEdit={handleArticleEdit} />
                       </div>
-                    ) : null;
-                  })()}
+                    ) : null}
                 </div>
+              </>
+                  );
+                })()}
               </>
             )}
           </div>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head><title>Firestore Write</title></head>
+<body>
+<h2>Firestore Write Test</h2>
+<pre id="output">Loading...</pre>
+<script>
+const API_KEY = 'AIzaSyDSwhKXm7KqaHVO2kb2PQ6qmarySPcZyJ0';
+const PROJECT_ID = 'gen-lang-client-0326385388';
+const DB_ID = 'ai-studio-507f7bd1-f48e-48fd-940f-92d962f6658b';
+
+async function run() {
+  const baseUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${DB_ID}/documents/leaderboard/rank_02`;
+  
+  // Read first
+  try {
+    const res = await fetch(baseUrl + '?key=' + API_KEY);
+    const data = await res.json();
+    document.getElementById('output').textContent = 'READ:\n' + JSON.stringify(data.fields, null, 2);
+    
+    // Now write updated data
+    const jpy = 190000; // PSA10 price in JPY
+    const hkd = Math.round(jpy * 0.0512);
+    const rawJpy = 3500; // RAW lowest listing
+    const rawHkd = Math.round(rawJpy * 0.0512);
+    
+    const updateUrl = baseUrl + '?key=' + API_KEY + '&updateMask.fieldPaths=market_data';
+    
+    const body = {
+      fields: {
+        market_data: {
+          mapValue: {
+            fields: {
+              psa10_price: { integerValue: String(hkd) },
+              raw_price: { integerValue: String(rawHkd) },
+              currency: { stringValue: 'HKD' },
+              last_jpy: { doubleValue: String(jpy) },
+              last_raw_jpy: { doubleValue: String(rawJpy) }
+            }
+          }
+        }
+      }
+    };
+    
+    const patchRes = await fetch(updateUrl, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const patchData = await patchRes.json();
+    console.log('WRITE result:', JSON.stringify(patchData, null, 2));
+  } catch(e) {
+    document.getElementById('output').textContent = 'Error: ' + e.message;
+  }
+}
+run();
+</script>
+</body>
+</html>
