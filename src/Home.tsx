@@ -53,17 +53,17 @@ const FeaturedArticle = ({ article, isLarge = false, onEdit }: { article: any, i
 
   if (isLarge) {
     // Large featured card: image LEFT | text RIGHT
-    // Image is a tall portrait card (1290x2796), so use aspect-[3/4] + taller min-height
+    // Full-height image container with h-full so the portrait card has max vertical space
     return (
       <div className="group relative flex flex-col sm:flex-row w-full h-full bg-[#0f0f1a] rounded-2xl sm:rounded-[1.5rem] overflow-hidden border border-white/10 transition-all duration-300 hover:border-blue-500/30 shadow-lg hover:-translate-y-1">
         <Link to={`/article/${article.id}`} className="absolute inset-0 z-10" aria-label={`閱讀 ${article.title}`} />
         
-        {/* Image area - left, portrait card so use taller aspect */}
-        <div className="relative w-full sm:w-[58%] aspect-[3/4] sm:aspect-auto sm:h-full min-h-[280px] sm:min-h-[380px] overflow-hidden z-0 bg-[#080810] shrink-0">
+        {/* Image area - full height left side with padding */}
+        <div className="relative w-full sm:w-[55%] h-[460px] sm:h-auto overflow-hidden z-0 bg-[#060610] shrink-0 flex items-center justify-center">
           <img 
             src={article.imageUrl} 
             alt={article.title} 
-            className="absolute inset-0 w-full h-full object-contain"
+            className="w-full h-full object-contain p-6"
             referrerPolicy="no-referrer"
             loading="lazy"
             decoding="async"
@@ -71,8 +71,7 @@ const FeaturedArticle = ({ article, isLarge = false, onEdit }: { article: any, i
               (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${article.id}/800/600?blur=2`;
             }}
           />
-          {/* Subtle right edge darken for separation */}
-          <div className="hidden sm:block absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-white/5 to-transparent" />
+          <div className="hidden sm:block absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-transparent via-white/5 to-transparent" />
         </div>
 
         {/* Text area - right */}
