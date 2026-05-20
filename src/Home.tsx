@@ -54,11 +54,11 @@ const FeaturedArticle = ({ article, isLarge = false, onEdit }: { article: any, i
   return (
     <div className="group relative flex flex-col sm:block w-full h-full bg-[#111111] sm:bg-[#1c1c1e] rounded-2xl sm:rounded-[1.5rem] overflow-hidden border border-gray-800 sm:border-white/5 transition-all duration-300 hover:border-white/10 shadow-lg hover:shadow-2xl hover:-translate-y-1">
       <Link to={`/article/${article.id}`} className="absolute inset-0 z-10" aria-label={`閱讀 ${article.title}`} />
-      <div className={`relative w-full ${isLarge ? 'aspect-[21/9]' : 'aspect-[4/3]'} sm:aspect-auto sm:h-full sm:min-h-[200px] overflow-hidden z-0 shrink-0`}>
+      <div className={`relative w-full ${isLarge ? 'aspect-[4/3]' : 'aspect-[4/3]'} sm:aspect-auto sm:h-full sm:min-h-[200px] overflow-hidden z-0 shrink-0 bg-[#1a1a2e]`}>
         <img 
           src={article.imageUrl} 
           alt={article.title} 
-          className="absolute inset-0 w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700" 
+          className="absolute inset-0 w-full h-full object-contain" 
           referrerPolicy="no-referrer"
           loading="lazy"
           decoding="async"
