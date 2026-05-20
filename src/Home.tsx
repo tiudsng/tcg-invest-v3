@@ -51,32 +51,102 @@ const FeaturedArticle = ({ article, isLarge = false, onEdit }: { article: any, i
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
+  if (isLarge) {
+    // Full-width landscape card: image LEFT 60% | text RIGHT 40%
+    return (
+      <div className="group relative flex flex-col sm:flex-row w-full h-full bg-[#0f0f1a] sm:bg-[#131320] rounded-2xl sm:rounded-[1.5rem] overflow-hidden border border-white/10 transition-all duration-300 hover:border-blue-500/30 shadow-lg hover:shadow-2xl hover:-translate-y-1">
+        <Link to={`/article/${article.id}`} className="absolute inset-0 z-10" aria-label={`閱讀 ${article.title}`} />
+        
+        {/* Image area - left 60% */}
+        <div className="relative w-full sm:w-[60%] aspect-[4/3] sm:aspect-auto sm:h-full min-h-[200px] sm:min-h-[280px] overflow-hidden z-0 bg-[#0a0a15] shrink-0">
+          <img 
+            src={article.imageUrl} 
+            alt={article.title} 
+            className="absolute inset-0 w-full h-full object-contain p-4"
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            decoding="async"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${article.id}/800/500?blur=2`;
+            }}
+          />
+          {/* Left side gradient */}
+          <div className="hidden sm:block absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#131320]" />
+        </div>
+
+        {/* Text area - right 40% */}
+        <div className="flex flex-col justify-center p-5 sm:p-8 z-0 flex-grow bg-[#131320] sm:bg-transparent">
+          {article.category && (
+            <span className="inline-block mb-3 px-3 py-1 bg-blue-600/20 text-blue-400 text-[10px] font-black rounded-full uppercase tracking-widest w-fit">
+              {article.category}
+            </span>
+          )}
+          <h3 className="text-base sm:text-2xl lg:text-3xl font-black tracking-tight text-white leading-tight mb-3 group-hover:text-blue-400 transition-colors line-clamp-3 sm:line-clamp-none">
+            {article.title}
+          </h3>
+          <p className="hidden sm:block text-sm text-gray-400 leading-relaxed line-clamp-2 mb-4">
+            {article.excerpt || '點擊閱讀全文...'}
+          </p>
+          <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+            <Clock className="w-3.5 h-3.5" />
+            <span>{article.readTime}</span>
+            {article.date && <span>· {article.date}</span>}
+          </div>
+        </div>
+
+        {isAdmin && (
+          <button
+            onClick={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const newUrl = window.prompt("請輸入新的封面圖片 URL:", article.imageUrl);
+              if (newUrl && newUrl !== article.imageUrl) {
+                try {
+                  await import('./firebase').then(({ db }) => import('firebase/firestore').then(f => f.updateDoc(f.doc(db, 'articles', article.id), { imageUrl: newUrl })));
+                  onEdit?.(article.id, newUrl);
+                } catch (err) { console.error(err); }
+              }
+            }}
+            className="absolute top-3 right-3 z-20 p-2 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-sm transition-colors"
+          >
+            <Camera className="w-4 h-4 text-white" />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Small card: thumbnail top | text bottom
   return (
-    <div className="group relative flex flex-col sm:block w-full h-full bg-[#111111] sm:bg-[#1c1c1e] rounded-2xl sm:rounded-[1.5rem] overflow-hidden border border-gray-800 sm:border-white/5 transition-all duration-300 hover:border-white/10 shadow-lg hover:shadow-2xl hover:-translate-y-1">
+    <div className="group relative flex flex-col w-full h-full bg-[#111111] sm:bg-[#1c1c1e] rounded-2xl sm:rounded-[1.5rem] overflow-hidden border border-gray-800 sm:border-white/5 transition-all duration-300 hover:border-white/10 shadow-lg hover:shadow-2xl hover:-translate-y-1">
       <Link to={`/article/${article.id}`} className="absolute inset-0 z-10" aria-label={`閱讀 ${article.title}`} />
-      <div className={`relative w-full ${isLarge ? 'aspect-[4/3]' : 'aspect-[4/3]'} sm:aspect-auto sm:h-full sm:min-h-[200px] overflow-hidden z-0 shrink-0 bg-[#1a1a2e]`}>
+      <div className="relative w-full aspect-[4/3] sm:aspect-auto sm:h-full sm:min-h-[160px] overflow-hidden z-0 shrink-0 bg-[#0a0a15]">
         <img 
           src={article.imageUrl} 
           alt={article.title} 
-          className="absolute inset-0 w-full h-full object-contain" 
+          className="absolute inset-0 w-full h-full object-contain p-3"
           referrerPolicy="no-referrer"
           loading="lazy"
           decoding="async"
           onError={(e) => {
-            (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${article.id}/800/600?blur=2`;
+            (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${article.id}/800/500?blur=2`;
           }}
         />
-        <div className="hidden sm:block absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
+        <div className="hidden sm:block absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
       </div>
-      <div className="p-3 sm:absolute sm:bottom-0 sm:left-0 sm:right-0 sm:p-6 z-0 pointer-events-none flex flex-col justify-start sm:justify-end flex-grow">
-        <h3 className={`${isLarge ? 'text-[15px] sm:text-3xl' : 'text-[12px] sm:text-xl'} font-bold sm:font-semibold tracking-tight text-white line-clamp-2 group-hover:text-blue-400 transition-colors leading-tight sm:leading-snug mb-1 sm:mb-2`}>
+      <div className="p-3 sm:absolute sm:bottom-0 sm:left-0 sm:right-0 sm:p-4 z-0 pointer-events-none flex flex-col justify-end flex-grow">
+        {article.category && (
+          <span className="inline-block mb-1.5 px-2 py-0.5 bg-blue-600/30 text-blue-300 text-[9px] font-bold rounded-full uppercase tracking-wider w-fit">
+            {article.category}
+          </span>
+        )}
+        <h3 className="text-[11px] sm:text-base font-bold tracking-tight text-white line-clamp-2 group-hover:text-blue-400 transition-colors leading-tight mb-1">
           {article.title}
         </h3>
         {article.readTime && (
-          <div className="flex items-center gap-1 text-[10px] sm:text-sm text-gray-400 sm:text-gray-300 font-medium mt-auto sm:mt-0">
-            <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+          <div className="flex items-center gap-1 text-[9px] sm:text-xs text-gray-400 font-medium">
+            <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             <span>{article.readTime}</span>
-            {article.date && <span className="truncate"> · {article.date}</span>}
           </div>
         )}
       </div>
@@ -88,19 +158,14 @@ const FeaturedArticle = ({ article, isLarge = false, onEdit }: { article: any, i
             const newUrl = window.prompt("請輸入新的封面圖片 URL:", article.imageUrl);
             if (newUrl && newUrl !== article.imageUrl) {
               try {
-                await setDoc(doc(db, 'articles', article.id), { imageUrl: newUrl }, { merge: true });
-                if (onEdit) onEdit(article.id, newUrl);
-                toast.success("封面圖片更新成功！");
-              } catch (error) {
-                console.error("Error updating cover image:", error);
-                toast.error("更新失敗，請稍後再試。");
-              }
+                await import('./firebase').then(({ db }) => import('firebase/firestore').then(f => f.updateDoc(f.doc(db, 'articles', article.id), { imageUrl: newUrl })));
+                onEdit?.(article.id, newUrl);
+              } catch (err) { console.error(err); }
             }
           }}
-          className="absolute top-2 right-2 sm:top-3 sm:right-3 p-1.5 sm:p-2 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full text-white transition-colors z-20"
-          title="編輯封面"
+          className="absolute top-2 right-2 z-20 p-1.5 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-sm transition-colors"
         >
-          <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <Camera className="w-3 h-3 text-white" />
         </button>
       )}
     </div>
