@@ -169,29 +169,37 @@ export const PriceLeaderboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Refactored (2026-05-13): Read from 'leaderboard' collection (SSOT)
-    // leaderboard already has: name, snkrdunk_id, market_data, psa_data, image_url
-    // No cross-ref needed — leaderboard IS the enriched data source
+    // Reading from 'leaderboard' as requested, which contains the curated leaderboard data
     const q = query(
       collection(db, 'leaderboard'),
       orderBy('rank', 'asc'),
-      limit(10)
+      limit(20)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       console.log(`[PriceLeaderboard] Snapshot received with ${snapshot.docs.length} docs`);
       try {
-        let productsData = snapshot.docs.map((doc) => {
-          const data = doc.data();
+        let productsData = snapshot.docs.map((listDoc) => {
+          const listData = listDoc.data();
+          // Logging sample data
+          if (listDoc.id === 'rank_01') {
+            console.log(`[PriceLeaderboard] Rank 01 data:`, listData);
+          }
+          
+          const marketData = cleanMarketData(listDoc.id, listData);
+
           return {
-            ...data,
-            id: doc.id,
-            name_zh: data.name_zh || data.name_jp || data.name,
-            image_url: data.image_url,
-            market_data: data.market_data || {},
-            psa_data: data.psa_data || {},
+            ...listData,
+            id: listDoc.id,
+            card_id: listData.card_id || listDoc.id,
+            market_data: marketData
           } as Product;
         });
+
+        // Filter out items without valid ranks and ensure array order matches rank
+        productsData = productsData.filter(a => typeof a.rank === 'number' && !isNaN(a.rank));
+        productsData.sort((a, b) => (a.rank || 0) - (b.rank || 0));
+        productsData = productsData.slice(0, 10);
 
         if (productsData.length === 0) {
           setProducts(MOCK_PRODUCTS);
@@ -200,12 +208,15 @@ export const PriceLeaderboard = () => {
         }
         setLoading(false);
       } catch (err) {
-        console.error("[PriceLeaderboard] Error processing leaderboard data:", err);
+        console.error("Error processing leaderboard data:", err);
         setProducts(MOCK_PRODUCTS);
         setLoading(false);
       }
-    }, (error) => {
-      console.error("[PriceLeaderboard] Error fetching leaderboard:", error);
+    }, (error: any) => {
+      console.error("Error fetching leaderboard from leaderboard:", error);
+      if (error.message && error.message.includes("Quota limit exceeded")) {
+        // Just silently use mock data
+      }
       setProducts(MOCK_PRODUCTS);
       setLoading(false);
     });
@@ -232,18 +243,21 @@ export const PriceLeaderboard = () => {
           <TrendingUp className="w-6 h-6" />
           實時十大熱門清單
         </h2>
-        {products[0]?.updatedAt && (
-          <div className="text-[10px] text-gray-500 font-medium">
-            最後更新: {new Date(products[0].updatedAt).toLocaleString()}
-          </div>
-        )}
+        {(() => {
+          const latestUpdate = (products[0]?.market_data as any)?.updatedAt || products[0]?.updatedAt;
+          return latestUpdate ? (
+            <div className="text-[10px] text-gray-500 font-medium tracking-wider">
+              最後更新: {new Date(latestUpdate).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </div>
+          ) : null;
+        })()}
       </div>
       <div className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {/* NO.1 Card */}
         {topCards[0] && (
           <div 
-            onClick={() => navigate(`/product/${topCards[0].card_id}`)}
+            onClick={() => navigate(`/product/${topCards[0].id || topCards[0].card_id}`)}
             className="col-span-2 lg:col-span-1 relative rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden border border-[#d4af37]/60 bg-black flex flex-col shadow-[0_0_20px_rgba(212,175,55,0.15)] cursor-pointer hover:scale-[1.01] transition-transform duration-300"
           >
             {/* Image Section - Matches exact card aspect ratio (63/88) so the whole card fits */}
@@ -256,7 +270,7 @@ export const PriceLeaderboard = () => {
                   referrerPolicy="no-referrer"
                   loading="lazy"
                   decoding="async"
-                  onError={(e) => handleImageError(e, topCards[0].image_url || (topCards[0] as any).imageUrl || (topCards[0] as any).imageURL, topCards[0].name_zh, `${topCards[0].set_name}|${topCards[0].card_number}`)}
+                  onError={(e) => handleImageError(e, topCards[0].image_url || (topCards[0] as any).imageUrl || (topCards[0] as any).imageURL, topCards[0].name_zh, `${topCards[0].set_name}|${topCards[0].card_number}`, topCards[0].card_id || topCards[0].id)}
                 />
               {/* Overlay Gradient to blend to black smoothly without hiding the card's bottom arts completely */}
               <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black to-transparent opacity-90"></div>
@@ -300,7 +314,7 @@ export const PriceLeaderboard = () => {
         {topCards.slice(1, 3).map((card, idx) => (
           <div 
             key={card.id || card.card_id} 
-            onClick={() => navigate(`/product/${card.card_id}`)}
+            onClick={() => navigate(`/product/${card.id || card.card_id}`)}
             className="col-span-1 relative rounded-3xl overflow-hidden border border-white/5 bg-black flex flex-col shadow-xl cursor-pointer hover:scale-[1.02] transition-transform duration-300"
           >
             {/* Image Section - Matches exact card aspect ratio */}
@@ -313,7 +327,7 @@ export const PriceLeaderboard = () => {
                 referrerPolicy="no-referrer"
                 loading="lazy"
                 decoding="async"
-                onError={(e) => handleImageError(e, card.image_url || (card as any).imageUrl || (card as any).imageURL, card.name_zh, `${card.set_name}|${card.card_number}`)}
+                onError={(e) => handleImageError(e, card.image_url || (card as any).imageUrl || (card as any).imageURL, card.name_zh, `${card.set_name}|${card.card_number}`, card.card_id || card.id)}
               />
               <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black to-transparent opacity-90"></div>
             </div>
@@ -370,7 +384,7 @@ export const PriceLeaderboard = () => {
                     {remainingCards.map((card) => (
                       <div 
                         key={card.id || card.card_id} 
-                        onClick={() => navigate(`/product/${card.card_id}`)}
+                        onClick={() => navigate(`/product/${card.id || card.card_id}`)}
                         className="bg-gray-50 dark:bg-[#1c1c1e] rounded-2xl p-3 flex items-center gap-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#222] transition-colors border border-gray-100 dark:border-transparent"
                       >
                         <div className="w-8 text-gray-400 font-bold text-sm text-center tracking-tighter">
@@ -384,7 +398,7 @@ export const PriceLeaderboard = () => {
                             referrerPolicy="no-referrer"
                             loading="lazy"
                             decoding="async"
-                            onError={(e) => handleImageError(e, card.image_url || (card as any).imageUrl || (card as any).imageURL, card.name_zh, `${card.set_name}|${card.card_number}`)}
+                            onError={(e) => handleImageError(e, card.image_url || (card as any).imageUrl || (card as any).imageURL, card.name_zh, `${card.set_name}|${card.card_number}`, card.card_id || card.id)}
                           />
                         </div>
                         <div className="flex-1 min-w-0">

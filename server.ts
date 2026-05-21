@@ -2,17 +2,22 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import axios from "axios";
-import { createServer as createViteServer } from "vite";
+// Lazy import vite only in development
+// import { createServer as createViteServer } from "vite";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import { db as dbClient } from "./src/firebase.ts";
+import { adminDb } from "./src/firebase-admin.ts";
 import fs from "fs";
-import apiRouter from "./api/index.js";
+import { scrapeSnkrdunkMarketStats, searchSnkrdunk, searchPokecaChart } from "./src/lib/snkrdunkSearchService.js";
+import { syncLeaderboard, syncSingleCard } from "./src/lib/leaderboardService.js";
+import { startBot, sendAdminNotification } from "./src/bot.js";
+import { collection, getDocs, doc, setDoc, addDoc, getDoc } from "firebase/firestore";
 
 async function startServer() {
   console.log("!!! SERVER STARTING - V2.2 - (SCRAPINGBEE REMOVED) !!!");
   const rawKey = process.env.GEMINI_API_KEY || "";
-  const GEMINI_API_KEY = rawKey.trim();
+  const GEMINI_API_KEY = rawKey.replace(/['"]/g, '').trim();
   
   if (GEMINI_API_KEY && GEMINI_API_KEY.length > 20) {
     const maskedKey = `${GEMINI_API_KEY.substring(0, 4)}...${GEMINI_API_KEY.substring(GEMINI_API_KEY.length - 4)}`;
@@ -27,12 +32,54 @@ async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: "50mb" }));
 
-  // Mount price-history API from ./api/index.ts (uses @google-cloud/firestore)
-  app.use("/api", apiRouter);
-
   // API routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", time: new Date().toISOString() });
+  });
+
+  app.get("/api/fix-leaderboard", async (req, res) => {
+    try {
+      const { getDoc, setDoc, doc } = await import("firebase/firestore");
+      const { baselineData } = await import("./src/lib/leaderboardService.js");
+      const { db } = await import("./src/firebase.js");
+
+      const configD = await getDoc(doc(db, 'config', 'leaderboard'));
+      const rankings = configD.data()?.rankings || [];
+      
+      const results = [];
+      for (let i = 0; i < Math.min(rankings.length, 10); i++) {
+        const snkrdunkId = rankings[i];
+        const rankNum = i + 1;
+        const rankKey = `rank_${rankNum.toString().padStart(2, '0')}`;
+        
+        const d = await getDoc(doc(db, 'leaderboard', rankKey));
+        let data = d.exists() ? d.data() : {};
+        
+        if (!data.name_zh || !data.rank || !data.card_id) {
+           const base = baselineData.find(b => b.id === rankKey) || baselineData[0];
+           const p = await getDoc(doc(db, 'products', snkrdunkId));
+           const pData = p.exists() ? p.data() : null;
+           
+           data.id = rankKey;
+           data.rank = rankNum;
+           data.card_id = snkrdunkId;
+           data.name_zh = pData?.name_zh || pData?.name || base.name_zh;
+           data.name_jp = pData?.name_jp || base.name_jp;
+           data.card_number = pData?.card_number || base.card_number;
+           data.set_name = pData?.set_name || base.set_name;
+           data.set_code = pData?.set_code || base.set_code;
+           data.image_url = pData?.image_url || base.image_url;
+           
+           await setDoc(doc(db, 'leaderboard', rankKey), data, { merge: true });
+           results.push(`Fixed ${rankKey} -> ${data.name_zh}`);
+        } else {
+           results.push(`OK ${rankKey} -> ${data.name_zh}`);
+        }
+      }
+      res.json({ status: "ok", results });
+    } catch(e) {
+      res.json({ error: String(e) });
+    }
   });
 
   // Proxy for downloading images from official site to bypass CORS
@@ -80,81 +127,34 @@ async function startServer() {
 
   // Snkrdunk Scraping Endpoint utilizing Puppeteer + Gemini
   app.get("/api/scrape-snkrdunk", async (req, res) => {
-    let browser = null;
     try {
       const { id } = req.query;
       if (!id || typeof id !== "string") {
         return res.status(400).json({ error: "Missing or invalid snkrdunk ID" });
       }
 
-      // SNKRDUNK product URL
-      const targetUrl = `https://snkrdunk.com/products/${id}`;
-
-      console.log(`[Scraper] Fetching Snkrdunk via Puppeteer: ${targetUrl}`);
-      const puppeteer = await import('puppeteer');
-      browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
-      });
-
-      const page = await browser.newPage();
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-      await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 35000 });
-      await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 2000)));
-
-      // Extract raw text
-      const fullText = await page.evaluate(() => {
-        document.querySelectorAll('script, style, noscript, svg, path, footer, nav').forEach(el => el.remove());
-        return document.body.innerText.replace(/\s+/g, ' ');
-      });
-
-      // Try to find price via selectors first
-      let psa10_jpy: number | null = null;
-      let raw_jpy: number | null = null;
-
-      const extractJpy = (pattern: RegExp) => {
-        const match = fullText.match(pattern);
-        if (match) {
-          const val = match[1].replace(/,/g, '');
-          return parseInt(val, 10);
-        }
-        return null;
-      };
-
-      // Patterns common for Snkrdunk card pages
-      psa10_jpy = extractJpy(/(?:PSA10|PSA\s?10|鑑定品|鑑定済み|鑑定済).*?¥\s?([0-9,]+)/i);
-      raw_jpy = extractJpy(/(?:新品|RAW|未鑑定|通常|未開封).*?¥\s?([0-9,]+)/i);
-
-      // If still null, try general price extraction
-      if (!psa10_jpy) {
-        // Look for the first price if it's potentially PSA10
-        const firstPrice = extractJpy(/¥\s?([0-9,]{3,})/);
-        if (firstPrice) psa10_jpy = firstPrice;
-      }
-
-      const parsedData = {
-        psa10_jpy,
-        raw_jpy,
-        extraction_method: "regex"
-      };
-
-      console.log(`[Scraper] Regex extraction success:`, parsedData);
+      const stats = await scrapeSnkrdunkMarketStats(id);
       
-      // Send result
+      const rateMap: Record<string, number> = { "US $": 150, "SG $": 110, "¥": 1 };
+      const cur = stats.currency.trim();
+      const conversionRate = rateMap[cur] || 150;
+      const psa10_jpy = stats.median_sold_psa10 ? Math.round(stats.median_sold_psa10 * conversionRate) : null;
+      const raw_jpy = null;
+
       res.json({
         id,
-        url: targetUrl,
-        data: parsedData
+        url: `https://snkrdunk.com/en/trading-cards/${id.replace('snkrdunk_', '')}/used`,
+        data: {
+          psa10_jpy,
+          raw_jpy,
+          extraction_method: stats.method,
+          stats
+        }
       });
 
     } catch (error: any) {
-      console.error("[Scraper] Error:", error.message);
-      if (error.response) {
-         console.error("[Scraper] Response details:", error.response.data);
-      }
+      console.error("[Scraper API] Error:", error.message);
       res.status(500).json({ error: "Failed to scrape snkrdunk" });
-    } finally {
-      if (browser) await browser.close();
     }
   });
 
@@ -167,13 +167,12 @@ async function startServer() {
         return res.status(500).json({ error: "伺服器未配置 GEMINI_API_KEY" });
       }
 
-      const { GoogleGenAI } = await import("@google/genai");
       const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
       const base64Data = image.split(",")[1] || image;
       const mimeType = image.split(";")[0].split(":")[1] || "image/jpeg";
 
       const response = await ai.models.generateContent({
-        model: "gemini-flash-latest",
+        model: "gemini-3-flash-preview",
         contents: [
           {
             text: `Identify this trading card from the image. 
@@ -205,14 +204,12 @@ async function startServer() {
   // Advanced sync endpoint: Handles scraping + AI analysis + Database write entirely on backend
   app.post("/api/sync-leaderboard", async (req, res) => {
     try {
-      const { syncLeaderboard } = await import('./src/lib/leaderboardService');
-      
       console.log("[SyncTask] Starting full leaderboard sync on backend...");
       
-      // Use dbClient for server-side updates
+      // Use adminDb for server-side updates
       await syncLeaderboard((msg) => {
         console.log(`[SyncProgress] ${msg}`);
-      }, dbClient, GEMINI_API_KEY);
+      }, adminDb, GEMINI_API_KEY);
 
       res.json({ success: true, message: "排行榜同步完成" });
     } catch (error: any) {
@@ -225,11 +222,10 @@ async function startServer() {
     try {
       console.log("[PSA Pop] v2.1 Starting bulk update (No ScrapingBee)...");
       
-      const { collection, getDocs, query, where, doc, setDoc } = await import('firebase/firestore');
-      const productsSnap = await getDocs(collection(dbClient, 'products'));
+      const productsSnap = await adminDb.collection('products').get();
       
       // Also fetch leaderboard to sync it
-      const leaderboardSnap = await getDocs(collection(dbClient, 'leaderboard'));
+      const leaderboardSnap = await adminDb.collection('leaderboard').get();
       const leaderboardMap = new Map(); // cardId -> rankId
       leaderboardSnap.docs.forEach(d => {
         const data = d.data();
@@ -260,10 +256,13 @@ async function startServer() {
            // Rely on AI for PSA Population as regular scraping is blocked
            if (process.env.GEMINI_API_KEY) {
               try {
-                  const { GoogleGenAI } = await import("@google/genai");
-                  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY.trim() });
+                  const cleanedApiKey = process.env.GEMINI_API_KEY.replace(/['"]/g, '').trim();
+                  const ai = new GoogleGenAI({ apiKey: cleanedApiKey });
                   const prompt = `Search for the latest official PSA Population data for the Pokemon TCG card: "${cardName}" with number "${cardNumber}". Provide JSON ONLY: { "psa_pop_total": number, "psa_pop_10": number }`;
-                  const response = await ai.models.generateContent({ model: "gemini-flash-latest", contents: prompt });
+                  const response = await ai.models.generateContent({
+                    model: "gemini-3-flash-preview",
+                    contents: prompt
+                  });
                   const result = JSON.parse((response.text||"").replace(/```json|```/g, '') || '{}');
                   if (result.psa_pop_total) psaPopTotal = result.psa_pop_total;
                   if (result.psa_pop_10) psaPop10 = result.psa_pop_10;
@@ -280,7 +279,7 @@ async function startServer() {
               };
 
               // Update Products
-              await setDoc(doc(dbClient, 'products', cardDocId), {
+              await adminDb.collection('products').doc(cardDocId).set({
                 market_data: {
                   ...(data.market_data || {}),
                   ...newPsaData
@@ -293,7 +292,7 @@ async function startServer() {
                 const rankDoc = leaderboardSnap.docs.find(d => d.id === rankId);
                 const rankData = rankDoc?.data() || {};
                 
-                await setDoc(doc(dbClient, 'leaderboard', rankId), {
+                await adminDb.collection('leaderboard').doc(rankId).set({
                   market_data: {
                     ...(rankData.market_data || {}),
                     ...newPsaData
@@ -330,10 +329,9 @@ async function startServer() {
         console.warn("[SyncTask] Notice: GEMINI_API_KEY is not configured. Sync will proceed without AI analysis.");
       }
       
-      const { syncSingleCard } = await import('./src/lib/leaderboardService.ts');
-      console.log(`[SyncTask] Syncing single card: ${rankKey} -> ${cardId} (Key: ${GEMINI_API_KEY.substring(0, 5)}...)`);
+      console.log(`[SyncTask] Syncing single card: ${rankKey} -> ${cardId}`);
       
-      const result = await syncSingleCard(rankKey, cardId, dbClient, GEMINI_API_KEY);
+      const result = await syncSingleCard(rankKey, cardId, adminDb, GEMINI_API_KEY);
       res.json({ success: true, data: result });
     } catch (error: any) {
       console.error("[SyncTask] Single card failure:", error);
@@ -341,65 +339,94 @@ async function startServer() {
     }
   });
 
-  // Report missing card → search SNKRDUNK + PokecaChart, notify admin
+  // New endpoint to handle missing card search on Snkrdunk and notify admin
   app.post("/api/report-missing-card", async (req, res) => {
     try {
-      const { keyword, chat_id } = req.body;
+      const { keyword } = req.body;
       if (!keyword) return res.status(400).json({ error: "Missing keyword" });
 
-      console.log(`[MissCard] Searching for: ${keyword}`);
-
-      // Dynamic import to avoid circular deps
-      const { searchMissingCard } = await import('./src/lib/snkrdunkSearchService.ts');
-      const { sendAdminNotification } = await import('./src/bot.ts');
-      const result = await searchMissingCard(keyword);
-
-      if (result.found) {
-        // Build notification message
-        let message = `🔍 *Miss Card Alert*\n\n`;
-        message += `*Search:* ${keyword}\n`;
-        if (result.card_name) message += `*Card:* ${result.card_name}\n`;
-        if (result.card_number) message += `*Number:* ${result.card_number}\n`;
-        if (result.set_code) message += `*Set:* ${result.set_code}\n`;
-        message += `\n`;
-        if (result.snkrdunk_url) message += `• SNKRDUNK: ${result.snkrdunk_url}\n`;
-        if (result.pokeca_url) message += `• PokecaChart: ${result.pokeca_url}\n`;
-        message += `\n_Source: ${result.source}_`;
-
-        // Send Telegram notification via unified function
-        const notified = await sendAdminNotification(message, chat_id);
-
-        res.json({ success: true, found: true, data: result, notified });
-      } else {
-        res.json({ success: true, found: false, error: result.error });
+      console.log(`[MissingCard] User reported missing card: ${keyword}`);
+      
+      // Save to Firestore logs using client dbClient (rules allow write)
+      try {
+        const reportData = {
+          keyword,
+          createdAt: new Date().toISOString(),
+          status: 'pending'
+        };
+        
+        await addDoc(collection(dbClient, 'missing_reports'), reportData);
+        console.log(`[MissingCard] Report saved to Firestore for: ${keyword}`);
+      } catch (dbErr) {
+        console.error("[MissingCard] Failed to log to Firestore (using dbClient):", dbErr);
       }
+
+      // Return response immediately so frontend doesn't hang
+      res.json({ success: true, count: 0, data: [] });
+
+      // Run Telegram notification and scraping in background
+      (async () => {
+        try {
+          console.log(`[MissingCard] Searching Snkrdunk and PokecaChart in background for: ${keyword}`);
+          
+          const snkrdunkSearchUrl = `https://snkrdunk.com/search/result?keyword=${encodeURIComponent(keyword)}`;
+          
+          const [snkrdunkResults, pokecaResults] = await Promise.all([
+            searchSnkrdunk(keyword).catch(e => { console.error(e); return [] as any[]; }),
+            searchPokecaChart(keyword).catch(e => { console.error(e); return [] as any[]; })
+          ]);
+
+          let message = `🚨 *Missing Card Report*\n\nUser searched for a missing card:\n*Keyword:* \`${keyword}\`\n\n`;
+          message += `🔗 [Search directly on Snkrdunk](${snkrdunkSearchUrl})\n\n`;
+
+          if (snkrdunkResults.length > 0) {
+            message += `*Snkrdunk Results:* \n`;
+            snkrdunkResults.slice(0, 3).forEach((item: any, index: number) => {
+              message += `${index + 1}. [${item.name}](${item.url}) \n`;
+              message += `   ID: \`${item.id}\` \n`;
+            });
+          }
+          
+          if (pokecaResults.length > 0) {
+            message += `\n*Pokeca-Chart Results:* \n`;
+            pokecaResults.slice(0, 3).forEach((item: any, index: number) => {
+              message += `${index + 1}. [${item.name}](${item.url}) \n`;
+              message += `   Slug: \`${item.slug}\` \n`;
+            });
+          }
+
+          if (snkrdunkResults.length === 0 && pokecaResults.length === 0) {
+             message += `_No auto-extracted results found._\n`;
+          }
+
+          await sendAdminNotification(message);
+          console.log(`[MissingCard] Background notification sent for: ${keyword}`);
+        } catch (e) {
+             console.error(`[MissingCard] Background task failed:`, e);
+        }
+      })();
     } catch (error: any) {
-      console.error("[MissCard] Error:", error);
+      console.error("[MissingCard] Route Error:", error);
       res.status(500).json({ error: error.message });
     }
   });
 
-  // Start Unified Telegram Bot (ONLY in development, NOT in serverless/production)
-  // In Vercel serverless, we use sendAdminNotification() directly instead of polling
-  if (process.env.NODE_ENV !== "production" && process.env.ENABLE_TELEGRAM_BOT === "true") {
-    try {
-      const { startBot } = await import('./src/bot.ts');
-      startBot().catch(err => console.error("Async Bot Error:", err));
-    } catch (err) {
-      console.error("Failed to start Telegraf bot:", err);
-    }
-  } else if (process.env.NODE_ENV === "production") {
-    console.log('[Server] Telegram bot polling disabled in production (serverless)');
+  // Start Unified Telegram Bot
+  try {
+    startBot().catch(err => console.error("Async Bot Error:", err));
+  } catch (err) {
+    console.error("Failed to start Telegraf bot:", err);
   }
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     try {
+      const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
         server: { 
           middlewareMode: true,
-          allowedHosts: true,
-          hmr: process.env.DISABLE_HMR === 'true' ? false : { port: 24678 }
+          allowedHosts: true as any,
+          hmr: process.env.DISABLE_HMR !== 'true'
         },
         appType: "spa",
       });
@@ -408,7 +435,11 @@ async function startServer() {
       console.error("Failed to start Vite Server", e);
     }
   } else {
-    const distPath = path.join(process.cwd(), "dist");
+    let distPath = path.join(process.cwd(), "dist");
+    if (!fs.existsSync(distPath)) {
+      distPath = process.cwd(); // Fallback if we are running inside the dist/build folder
+    }
+    console.log(`[Server] Serving static files from: ${distPath}`);
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));

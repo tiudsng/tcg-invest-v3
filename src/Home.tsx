@@ -51,102 +51,32 @@ const FeaturedArticle = ({ article, isLarge = false, onEdit }: { article: any, i
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
-  if (isLarge) {
-    // Large featured card: image LEFT | text RIGHT
-    // Full-height image container with h-full so the portrait card has max vertical space
-    return (
-      <div className="group relative flex flex-col sm:flex-row w-full h-full bg-[#0f0f1a] rounded-2xl sm:rounded-[1.5rem] overflow-hidden border border-white/10 transition-all duration-300 hover:border-blue-500/30 shadow-lg hover:-translate-y-1">
-        <Link to={`/article/${article.id}`} className="absolute inset-0 z-10" aria-label={`閱讀 ${article.title}`} />
-        
-        {/* Image area - full height left side with padding */}
-        <div className="relative w-full sm:w-[55%] h-[460px] sm:h-auto overflow-hidden z-0 bg-[#060610] shrink-0 flex items-center justify-center">
-          <img 
-            src={article.imageUrl} 
-            alt={article.title} 
-            className="w-full h-full object-contain p-6"
-            referrerPolicy="no-referrer"
-            loading="lazy"
-            decoding="async"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${article.id}/800/600?blur=2`;
-            }}
-          />
-          <div className="hidden sm:block absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-transparent via-white/5 to-transparent" />
-        </div>
-
-        {/* Text area - right */}
-        <div className="flex flex-col justify-center p-5 sm:p-7 z-0 flex-grow bg-[#131320] sm:bg-transparent">
-          {article.category && (
-            <span className="inline-block mb-3 px-3 py-1 bg-blue-600/20 text-blue-400 text-[10px] font-black rounded-full uppercase tracking-widest w-fit">
-              {article.category}
-            </span>
-          )}
-          <h3 className="text-base sm:text-xl lg:text-2xl font-black tracking-tight text-white leading-tight mb-3 group-hover:text-blue-400 transition-colors line-clamp-3 sm:line-clamp-none">
-            {article.title}
-          </h3>
-          <p className="hidden sm:block text-sm text-gray-400 leading-relaxed line-clamp-2 mb-4">
-            {article.excerpt || '點擊閱讀全文...'}
-          </p>
-          <div className="flex items-center gap-2 text-xs text-gray-500 font-medium mt-auto">
-            <Clock className="w-3.5 h-3.5" />
-            <span>{article.readTime}</span>
-            {article.date && <span>· {article.date}</span>}
-          </div>
-        </div>
-
-        {isAdmin && (
-          <button
-            onClick={async (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              const newUrl = window.prompt("請輸入新的封面圖片 URL:", article.imageUrl);
-              if (newUrl && newUrl !== article.imageUrl) {
-                try {
-                  await import('./firebase').then(({ db }) => import('firebase/firestore').then(f => f.updateDoc(f.doc(db, 'articles', article.id), { imageUrl: newUrl })));
-                  onEdit?.(article.id, newUrl);
-                } catch (err) { console.error(err); }
-              }
-            }}
-            className="absolute top-3 right-3 z-20 p-2 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-sm transition-colors"
-          >
-            <Camera className="w-4 h-4 text-white" />
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  // Small card: thumbnail top | text bottom
   return (
-    <div className="group relative flex flex-col w-full h-full bg-[#111111] sm:bg-[#1c1c1e] rounded-2xl sm:rounded-[1.5rem] overflow-hidden border border-gray-800 sm:border-white/5 transition-all duration-300 hover:border-white/10 shadow-lg hover:shadow-2xl hover:-translate-y-1">
+    <div className="group relative flex flex-col sm:block w-full h-full bg-[#111111] sm:bg-[#1c1c1e] rounded-2xl sm:rounded-[1.5rem] overflow-hidden border border-gray-800 sm:border-white/5 transition-all duration-300 hover:border-white/10 shadow-lg hover:shadow-2xl hover:-translate-y-1">
       <Link to={`/article/${article.id}`} className="absolute inset-0 z-10" aria-label={`閱讀 ${article.title}`} />
-      <div className="relative w-full aspect-[4/3] sm:aspect-auto sm:h-full sm:min-h-[160px] overflow-hidden z-0 shrink-0 bg-[#0a0a15]">
+      <div className={`relative w-full ${isLarge ? 'aspect-[21/9]' : 'aspect-[4/3]'} sm:aspect-auto sm:h-full sm:min-h-[200px] overflow-hidden z-0 shrink-0 ${article.imageFit === 'contain' || article.imageUrl?.includes('contain') ? 'bg-black' : ''}`}>
         <img 
           src={article.imageUrl} 
           alt={article.title} 
-          className="absolute inset-0 w-full h-full object-contain p-3"
+          className={`absolute inset-0 w-full h-full ${article.imageFit === 'contain' || article.imageUrl?.includes('contain') ? 'object-contain' : 'object-cover'} transform group-hover:scale-105 transition-transform duration-700`} 
           referrerPolicy="no-referrer"
           loading="lazy"
           decoding="async"
           onError={(e) => {
-            (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${article.id}/800/500?blur=2`;
+            (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${article.id}/800/600?blur=2`;
           }}
         />
-        <div className="hidden sm:block absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+        <div className="hidden sm:block absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
       </div>
-      <div className="p-3 sm:absolute sm:bottom-0 sm:left-0 sm:right-0 sm:p-4 z-0 pointer-events-none flex flex-col justify-end flex-grow">
-        {article.category && (
-          <span className="inline-block mb-1.5 px-2 py-0.5 bg-blue-600/30 text-blue-300 text-[9px] font-bold rounded-full uppercase tracking-wider w-fit">
-            {article.category}
-          </span>
-        )}
-        <h3 className="text-[11px] sm:text-base font-bold tracking-tight text-white line-clamp-2 group-hover:text-blue-400 transition-colors leading-tight mb-1">
+      <div className="p-3 sm:absolute sm:bottom-0 sm:left-0 sm:right-0 sm:p-6 z-0 pointer-events-none flex flex-col justify-start sm:justify-end flex-grow">
+        <h3 className={`${isLarge ? 'text-[15px] sm:text-3xl' : 'text-[12px] sm:text-xl'} font-bold sm:font-semibold tracking-tight text-white line-clamp-2 group-hover:text-blue-400 transition-colors leading-tight sm:leading-snug mb-1 sm:mb-2`}>
           {article.title}
         </h3>
         {article.readTime && (
-          <div className="flex items-center gap-1 text-[9px] sm:text-xs text-gray-400 font-medium">
-            <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+          <div className="flex items-center gap-1 text-[10px] sm:text-sm text-gray-400 sm:text-gray-300 font-medium mt-auto sm:mt-0">
+            <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             <span>{article.readTime}</span>
+            {article.date && <span className="truncate"> · {article.date}</span>}
           </div>
         )}
       </div>
@@ -158,14 +88,19 @@ const FeaturedArticle = ({ article, isLarge = false, onEdit }: { article: any, i
             const newUrl = window.prompt("請輸入新的封面圖片 URL:", article.imageUrl);
             if (newUrl && newUrl !== article.imageUrl) {
               try {
-                await import('./firebase').then(({ db }) => import('firebase/firestore').then(f => f.updateDoc(f.doc(db, 'articles', article.id), { imageUrl: newUrl })));
-                onEdit?.(article.id, newUrl);
-              } catch (err) { console.error(err); }
+                await setDoc(doc(db, 'articles', article.id), { imageUrl: newUrl }, { merge: true });
+                if (onEdit) onEdit(article.id, newUrl);
+                toast.success("封面圖片更新成功！");
+              } catch (error) {
+                console.error("Error updating cover image:", error);
+                toast.error("更新失敗，請稍後再試。");
+              }
             }
           }}
-          className="absolute top-2 right-2 z-20 p-1.5 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-sm transition-colors"
+          className="absolute top-2 right-2 sm:top-3 sm:right-3 p-1.5 sm:p-2 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full text-white transition-colors z-20"
+          title="編輯封面"
         >
-          <Camera className="w-3 h-3 text-white" />
+          <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
       )}
     </div>
@@ -180,11 +115,11 @@ const ListArticle = ({ article, onEdit }: { article: any, onEdit?: (id: string, 
     <div className="group relative block w-full bg-[#1c1c1e] rounded-[1.25rem] sm:rounded-[1.5rem] overflow-hidden border border-white/5 p-2.5 sm:p-3 transition-all duration-300 hover:border-white/10">
       <Link to={`/article/${article.id}`} className="absolute inset-0 z-10" aria-label={`閱讀 ${article.title}`} />
       <div className="flex gap-3 sm:gap-4 relative z-0 pointer-events-none">
-        <div className="relative w-20 h-20 sm:w-28 sm:h-28 rounded-xl overflow-hidden shrink-0">
+        <div className={`relative w-20 h-20 sm:w-28 sm:h-28 rounded-xl overflow-hidden shrink-0 ${article.imageFit === 'contain' || article.imageUrl?.includes('contain') ? 'bg-black' : ''}`}>
           <img 
             src={article.imageUrl} 
             alt={article.title} 
-            className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700" 
+            className={`w-full h-full ${article.imageFit === 'contain' || article.imageUrl?.includes('contain') ? 'object-contain' : 'object-cover'} transform group-hover:scale-105 transition-transform duration-700`} 
             referrerPolicy="no-referrer"
             onError={(e) => {
               (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${article.id}/400/400?blur=1`;
@@ -304,8 +239,11 @@ export const Home: React.FC = () => {
 
       setLastListingDoc(snapshot.docs[snapshot.docs.length - 1] || null);
       setHasMoreListings(snapshot.docs.length === 20);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching listings:", error);
+      if (error.message && error.message.includes("Quota limit exceeded")) {
+         toast.error("系統目前達到資料庫免費讀取上限，部分資料無法刷新。");
+      }
     } finally {
       setLoading(false);
       setIsFetchingMore(false);
@@ -346,8 +284,11 @@ export const Home: React.FC = () => {
 
       setLastWantDoc(snapshot.docs[snapshot.docs.length - 1] || null);
       setHasMoreWants(snapshot.docs.length === 20);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching want listings:", error);
+      if (error.message && error.message.includes("Quota limit exceeded")) {
+         toast.error("系統目前達到資料庫免費讀取上限，部分資料無法刷新。");
+      }
     } finally {
       setLoadingWants(false);
       setIsFetchingMoreWants(false);
@@ -641,46 +582,40 @@ export const Home: React.FC = () => {
               [...Array(3)].map((_, i) => <ArticleSkeleton key={i} />)
             ) : (
               <>
-                {(() => {
-                  const getZoneArticle = (zoneId: number, excludeIds: string[] = []) => {
-                    return localArticles
-                      .filter(a => a.zone === zoneId && !excludeIds.includes(a.id))
-                      .sort((a, b) => {
-                        const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
-                        const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
-                        return timeB - timeA;
-                      })[0];
-                  };
-                  const article1 = getZoneArticle(1);
-                  const article2 = getZoneArticle(2, article1 ? [article1.id] : []);
-                  const article3 = getZoneArticle(3, [article1?.id, article2?.id].filter(Boolean));
-                  return (
-              <>
                 {/* 文章 1 區 (Large Slot) */}
                 <div className="lg:col-span-2 h-full">
-                  {article1 ? (
+                  {(() => {
+                    const article1 = localArticles.find(a => a.zone === 1) || localArticles[0];
+                    return article1 ? (
                       <div className="h-full">
                         <FeaturedArticle article={article1} isLarge onEdit={handleArticleEdit} />
                       </div>
-                    ) : null}
+                    ) : null;
+                  })()}
                 </div>
                 
                 {/* 文章 2 區 & 3 區 (Small Slots) */}
                 <div className="lg:col-span-1 grid grid-cols-2 lg:flex lg:flex-col gap-3 sm:gap-6 h-full">
-                  {article2 ? (
+                  {(() => {
+                    const article1 = localArticles.find(a => a.zone === 1) || localArticles[0];
+                    const article2 = localArticles.find(a => a.zone === 2 && a.id !== article1?.id) || localArticles.find(a => a.id !== article1?.id);
+                    return article2 ? (
                       <div className="flex-1">
                         <FeaturedArticle article={article2} onEdit={handleArticleEdit} />
                       </div>
-                    ) : null}
-                  {article3 ? (
+                    ) : null;
+                  })()}
+                  {(() => {
+                    const article1 = localArticles.find(a => a.zone === 1) || localArticles[0];
+                    const article2 = localArticles.find(a => a.zone === 2 && a.id !== article1?.id) || localArticles.find(a => a.id !== article1?.id);
+                    const article3 = localArticles.find(a => a.zone === 3 && a.id !== article1?.id && a.id !== article2?.id) || localArticles.find(a => a.id !== article1?.id && a.id !== article2?.id);
+                    return article3 ? (
                       <div className="flex-1">
                         <FeaturedArticle article={article3} onEdit={handleArticleEdit} />
                       </div>
-                    ) : null}
+                    ) : null;
+                  })()}
                 </div>
-              </>
-                  );
-                })()}
               </>
             )}
           </div>

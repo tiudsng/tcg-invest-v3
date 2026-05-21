@@ -422,9 +422,9 @@ if (bot) {
       const record: any = { source: 'scraper' };
       
       // Attempt to get PSA 10 population
-      const docSnap = await getDocs(query(collection(db, 'products')));
-      const targetDoc = docSnap.docs.find(d => d.id === cardId);
-      if (targetDoc) {
+      const targetDocRef = doc(db, 'products', cardId);
+      const targetDoc = await getDoc(targetDocRef);
+      if (targetDoc.exists()) {
         const data = targetDoc.data();
         if (data.set_code && data.card_number) {
           const setId = `${data.set_code}-${data.card_number}`.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
