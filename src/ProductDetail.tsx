@@ -176,7 +176,7 @@ export const ProductDetail = () => {
               alt={product.name_zh} 
               className={`${getImageClass(getProductImage())} w-full h-full md:h-full object-contain`}
               referrerPolicy="no-referrer"
-              onError={(e) => handleImageError(e, product.image_url || product.imageUrl || (product as any).imageURL, product.name_zh, `${product.set_name}|${product.card_number}`)}
+              onError={(e) => handleImageError(e, product.image_url || product.imageUrl || (product as any).imageURL, product.name_zh, `${product.set_name}|${product.card_number}`, product.card_id)}
             />
             
             <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover/img:opacity-100 hidden md:flex">

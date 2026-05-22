@@ -114,9 +114,23 @@ export function getHighResImage(url?: string, cardName?: string, setAndNumber?: 
   }
 
   // Pikachu with Grey Felt Hat (Vanish Pikachu - SVP 085)
-  // name_zh for rank_01 is '梵高比卡超' (Traditional), not '梵谷' (Simplified)
   if (name.includes('戴灰') || name.includes('氈帽') || name.includes('梵谷') || name.includes('梵高') || (idStr.includes('svp') && idStr.includes('085'))) {
     return 'https://images.pokemontcg.io/svp/85_hires.png';
+  }
+
+  // Lillie SAR (SV5a 191/170) — TCGPlayer 304800
+  if ((cardId && cardId.includes('91323')) || (idStr.includes('sv5a') && idStr.includes('191'))) {
+    return 'https://product-images.tcgplayer.com/fit-in/437x437/304800.jpg';
+  }
+
+  // Pikachu ex (SV8a 236/187) — TCGPlayer 253999
+  if ((cardId && cardId.includes('469638')) || (idStr.includes('sv8a') && idStr.includes('236'))) {
+    return 'https://product-images.tcgplayer.com/fit-in/437x437/253999.jpg';
+  }
+
+  // M Charizard ex (BW9 082/122) — TCGPlayer 313829
+  if ((cardId && cardId.includes('730968')) || (idStr.includes('bw9') && idStr.includes('82'))) {
+    return 'https://product-images.tcgplayer.com/fit-in/437x437/313829.jpg';
   }
 
   // Pikachu ex (SV8a 236/187)
@@ -237,16 +251,16 @@ export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event
          updateSrc('https://images.pokemontcg.io/swsh6/95_hires.png');
          return;
        }
-       // rank_08/09: snkrdunk_93379/469638 → Pikachu ex SV8a → sv8/236
-       if (snkrdunkNum === '93379' || snkrdunkNum === '469638') {
-         updateSrc('https://images.pokemontcg.io/sv8/236_hires.png');
-         return;
-       }
-       // rank_10: snkrdunk_730968 → S8a/082 → bw9/82
-       if (snkrdunkNum === '730968') {
-         updateSrc('https://images.pokemontcg.io/bw9/82_hires.png');
-         return;
-       }
+// rank_08/09: snkrdunk_93379/469638 → Pikachu ex SV8a → TCGPlayer (pokemontcg.io 404)
+      if (snkrdunkNum === '93379' || snkrdunkNum === '469638') {
+        updateSrc('https://product-images.tcgplayer.com/fit-in/437x437/253999.jpg');
+        return;
+      }
+      // rank_10: snkrdunk_730968 → M Charizard ex BW9 → TCGPlayer (pokemontcg.io 404)
+      if (snkrdunkNum === '730968') {
+        updateSrc('https://product-images.tcgplayer.com/fit-in/437x437/313829.jpg');
+        return;
+      }
      }
 
      // Pokeca-chart.com 404 → use pokemontcg.io as final fallback for GCS
