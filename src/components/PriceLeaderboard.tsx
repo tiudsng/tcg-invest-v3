@@ -201,7 +201,8 @@ export const PriceLeaderboard = () => {
         productsData.sort((a, b) => (a.rank || 0) - (b.rank || 0));
         productsData = productsData.slice(0, 10);
 
-        if (productsData.length === 0) {
+        if (productsData.length < 10) {
+          console.warn(`[PriceLeaderboard] Only ${productsData.length}/10 docs from Firestore, falling back to MOCK_PRODUCTS`);
           setProducts(MOCK_PRODUCTS);
         } else {
           setProducts(productsData);
