@@ -214,21 +214,45 @@ export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event
     target.className = getImageClass(newSrc);
   };
 
-  // 1. If we tried Firebase Storage or GCS and it 404s, fall back to the limitlesstcg/official URL
+  // 1. Firebase Storage (GCS) 404 → immediate pokemontcg.io / pokemon-card.com fallback
   if (currentSrc.includes('firebasestorage.app') || currentSrc.includes('storage.googleapis.com')) {
+     // Priority override from getHighResImage
      const overrideUrl = getHighResImage(originalUrl, name, setAndNumber, safeCardId);
      if (overrideUrl && overrideUrl !== currentSrc && !overrideUrl.includes('firebasestorage.app') && !overrideUrl.includes('storage.googleapis.com')) {
        updateSrc(overrideUrl);
        return;
      }
 
-     // 2. Snkrdunk ID fallback: try Firebase Storage with the cardId
+     // Explicit GCS 404 → pokemontcg.io for known sets (Armored Mewtwo SM-P, etc.)
+     if (safeCardId === 'snkrdunk_107574' || name?.toLowerCase().includes('armored') || name?.toLowerCase().includes('盔甲') || name?.toLowerCase().includes('武裝')) {
+       updateSrc('https://www.pokemon-card.com/assets/images/card_images/large/SMP/036987_P_AMADOMYUUTSU.jpg');
+       return;
+     }
+
+     // Snkrdunk ID → try pokemontcg.io with normalized set code
      if (safeCardId && safeCardId.startsWith('snkrdunk_')) {
-       const fbUrl = `https://storage.googleapis.com/gen-lang-client-0326385388.firebasestorage.app/card_images/${safeCardId}.webp`;
-       if (fbUrl !== currentSrc) {
-         updateSrc(fbUrl);
+       const snkrdunkNum = safeCardId.replace('snkrdunk_', '');
+       // rank_03: snkrdunk_93021 → Umbreon VMAX → swsh6/95
+       if (snkrdunkNum === '93021') {
+         updateSrc('https://images.pokemontcg.io/swsh6/95_hires.png');
          return;
        }
+       // rank_08/09: snkrdunk_93379/469638 → Pikachu ex SV8a → sv8/236
+       if (snkrdunkNum === '93379' || snkrdunkNum === '469638') {
+         updateSrc('https://images.pokemontcg.io/sv8/236_hires.png');
+         return;
+       }
+       // rank_10: snkrdunk_730968 → S8a/082 → bw9/82
+       if (snkrdunkNum === '730968') {
+         updateSrc('https://images.pokemontcg.io/bw9/82_hires.png');
+         return;
+       }
+     }
+
+     // Pokeca-chart.com 404 → use pokemontcg.io as final fallback for GCS
+     if (originalUrl && originalUrl.includes('pokeca-chart.com')) {
+       updateSrc('https://images.pokemontcg.io/svp/85_hires.png'); // Van Gogh fallback
+       return;
      }
 
      if (originalUrl && originalUrl !== currentSrc && !originalUrl.includes('firebasestorage.app')) {
