@@ -204,21 +204,31 @@ export function getHighResImage(url?: string, cardName?: string, setAndNumber?: 
  * Handle image loading errors by trying common fallbacks.
  * Usage: onError={(e) => handleImageError(e, originalUrl, fallbackName)}
  */
-export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event>, originalUrl?: string, name?: string, setAndNumber?: string) {
+export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event>, originalUrl?: string, name?: string, setAndNumber?: string, cardId?: string) {
   const target = e.currentTarget;
   const currentSrc = target.src;
-  
+  const safeCardId = cardId || undefined;
+
   const updateSrc = (newSrc: string) => {
     target.src = newSrc;
     target.className = getImageClass(newSrc);
   };
-  
+
   // 1. If we tried Firebase Storage or GCS and it 404s, fall back to the limitlesstcg/official URL
   if (currentSrc.includes('firebasestorage.app') || currentSrc.includes('storage.googleapis.com')) {
-     const overrideUrl = getHighResImage(originalUrl, name, setAndNumber); // Call without cardId to get standard manual mappings
+     const overrideUrl = getHighResImage(originalUrl, name, setAndNumber, safeCardId);
      if (overrideUrl && overrideUrl !== currentSrc && !overrideUrl.includes('firebasestorage.app') && !overrideUrl.includes('storage.googleapis.com')) {
        updateSrc(overrideUrl);
        return;
+     }
+
+     // 2. Snkrdunk ID fallback: try Firebase Storage with the cardId
+     if (safeCardId && safeCardId.startsWith('snkrdunk_')) {
+       const fbUrl = `https://storage.googleapis.com/gen-lang-client-0326385388.firebasestorage.app/card_images/${safeCardId}.webp`;
+       if (fbUrl !== currentSrc) {
+         updateSrc(fbUrl);
+         return;
+       }
      }
 
      if (originalUrl && originalUrl !== currentSrc && !originalUrl.includes('firebasestorage.app')) {
@@ -227,7 +237,7 @@ export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event
      }
   }
 
-  // 2. If we tried pokemontcg.io and it fails, try a different stable set or placeholder
+  // 3. If we tried pokemontcg.io and it fails, try a different stable set or placeholder
   if (currentSrc.includes('pokemontcg.io')) {
     if (currentSrc.includes('swsh7/215')) {
       updateSrc('https://images.pokemontcg.io/swp/215_hires.png'); // Example alternative
@@ -235,7 +245,7 @@ export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event
     }
   }
 
-  // 3. Specific high-value card fallbacks
+  // 4. Specific high-value card fallbacks
   if (name?.includes('伊布') || name?.includes('Umbreon') || name?.includes('ブラッキー') || name?.includes('月亮')) {
     if (currentSrc !== 'https://images.pokemontcg.io/swsh7/215_hires.png') {
       updateSrc('https://images.pokemontcg.io/swsh7/215_hires.png');
@@ -250,16 +260,14 @@ export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event
     }
   }
 
-  // 4. If we tried high-res override but it failed, try the original URL if available
+  // 5. If we tried high-res override but it failed, try the original URL if available
   if (originalUrl && currentSrc !== originalUrl && !originalUrl.includes('firebasestorage.app')) {
     updateSrc(originalUrl);
     return;
   }
 
-  // 5. Final fallback: Placeholder (Pokemon Card Back)
+  // 6. Final fallback: Placeholder (Pokemon Card Back)
   if (!target.src.includes('cardback')) {
-    // Use a clearer "image coming soon" or placeholder if available, 
-    // but a neutral card back is better than showing the wrong card.
     updateSrc('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png');
   }
 }

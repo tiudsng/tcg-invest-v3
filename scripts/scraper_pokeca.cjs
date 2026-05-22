@@ -37,7 +37,7 @@ function formatDuration(ms) {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const JPY_TO_HKD = 0.052;
+const JPY_TO_HKD = 0.0512;
 const POKECA_API = 'https://pokeca-chart.com/ch/php';
 
 const CONCURRENCY = parseInt(process.argv.includes('--fast') ? '20' : '3'); // IP protection: low concurrency
