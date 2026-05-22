@@ -63,8 +63,70 @@ AGENT 每次爬取或更新價格資料時，**必須**遵守以下規則，避�
 ### 4. 高清圖片與排行榜維護 (High-Res & Leaderboard)
 對於特別是排行榜（Leaderboard）前列的卡片，Agent 應確保其圖片解析度達到「大圖等級」：
 *   **解析度標準**: 建議解析度等級為 **733 x 1024** 或更高。
-*   **來源優先權**: 
+*   **來源優先權**:
     1.  **Firebase Storage**: 已手動上傳的高清圖。
     2.  **Pokeca-Chart 高清源**: 網址包含 `pokeca-chart.com/wp-content/uploads/` 的原始圖檔（通常為 733x1024）。
     3.  **Snkrdunk Fallback**: 僅在無高清源時使用 `cdn.snkrdunk.com` 的去背圖。
 *   **排行榜維護**: 每次更新排行榜時，務必檢查 `leaderboard` 集合中每項的 `image_url` 是否已對應到最優質的高清圖片源，並確保 `src/lib/imageUtils.ts` 已包含該卡片的解析邏輯。
+
+### 5. 圖片 Source 嚴格規則（2026-05-22 強制）🔴
+**TL;DR**：`pokemontcg.io` 除非係 Van Gogh，否則**嚴禁使用**。
+
+| 卡 | 來源 | 備註 |
+|----|------|------|
+| **SVP 085 梵高比卡超**（rank_01） | `pokemontcg.io/svp/85_hires.png` | ✅ 唯一例外 |
+| 其餘所有卡 | `pokemon-card.com` / `pokeca-chart.com` / TCGPlayer | ❌ pokemontcg.io 嚴禁 |
+
+**原因**：pokemontcg.io 係 404 高發戶，Firestore 死 URL → fallback 去 pokemontcg.io 仍然死圖。
+
+**TCGPlayer URL 格式**：
+```
+https://product-images.tcgplayer.com/fit-in/437x437/{productId}.jpg
+```
+
+**已驗證的 TCGPlayer Product IDs（2026-05-22）**：
+| 卡 | set_code | card_number | TCGPlayer product ID |
+|----|----------|-------------|---------------------|
+| Lillie SAR | SV5a | 191 | 304800 |
+| 皮卡丘 ex | SV8a | 236 | **253999**（唔係 297629） |
+| M Charizard ex | BW9 | 082 | 313829 |
+
+**`handleImageError` 第 5 參數 `cardId`**：
+- `imageUtils.ts` 的 `handleImageError(e, originalUrl, name, setAndNumber, cardId)` 接受 5 個參數
+- Call sites 必須傳入 `cardId`（之前只傳 4 個參數，cardId 被忽略，導致 override 失效）
+- 所有 call sites：`ProductDetail.tsx`、`PriceLeaderboard.tsx`
+
+**Pokeca-chart.com 死 URL（2026-05-22 確認）**：
+| Rank | 卡 | pokeca-chart.com URL | HTTP |
+|------|-----|----------------------|------|
+| rank_02 | 月亮伊布 VMAX | `BURAKKI-VMAX-733x1024.jpg` | **404** |
+| rank_03 | 盔甲超夢 | `AMADOMYUUTSU.jpg` | **404** |
+| rank_08/09/10 | — | limitlesstcg S3 | **403** |
+
+### 6. PSA Population 數據流向（2026-05-22）
+**重要**：PSA population（`psa_pop_total`、`psa_pop_10`、`psa_pop_10_percent`）係**動態數據**，唔存在於 Firestore leaderboard docs，必須從 pokeca-chart.com 即時拉取。
+
+**數據流向**：
+```
+pokeca-chart.com API → CardReader.getCard() → ProductDetail.tsx useEffect enrich
+                    ↘ Firestore leaderboard.market_data.psa_pop_total（只係備份）
+```
+
+**ProductDetail.tsx `useEffect` 邏輯**：
+```typescript
+useEffect(() => {
+  if (!product?.card_id || product?.market_data?.psa_pop_total) return;
+  const enrichPsa = async () => {
+    const card = await CardReader.getCard(product.card_id);
+    if (card?.market_data?.psa_pop_total) {
+      setProduct(prev => prev ? {
+        ...prev,
+        market_data: { ...prev.market_data, ...card.market_data }
+      } : null);
+    }
+  };
+  enrichPsa();
+}, [product?.card_id, product?.market_data?.psa_pop_total]);
+```
+
+**領導 board / MOCK_PRODUCTS 只有價格數據**（`psa10_price`、`raw_price`），沒有 PSA population。
