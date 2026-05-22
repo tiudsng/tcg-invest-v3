@@ -116,6 +116,26 @@ export const ProductDetail = () => {
     fetchProduct();
   }, [id]);
 
+  // Fetch PSA population data after product loads from leaderboard/mock
+  useEffect(() => {
+    if (!product?.card_id || product?.market_data?.psa_pop_total) return;
+    
+    const enrichPsa = async () => {
+      try {
+        const card = await CardReader.getCard(product.card_id);
+        if (card?.market_data?.psa_pop_total) {
+          setProduct(prev => prev ? {
+            ...prev,
+            market_data: { ...prev.market_data, ...card.market_data }
+          } : null);
+        }
+      } catch (e) {
+        // silent fail — PSA data is supplementary
+      }
+    };
+    enrichPsa();
+  }, [product?.card_id, product?.market_data?.psa_pop_total]);
+
   if (loading) {
     return (
       <div className="min-h-screen pt-20 flex items-center justify-center bg-[#0a0a0a]">
