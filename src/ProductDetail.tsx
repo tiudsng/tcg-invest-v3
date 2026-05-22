@@ -8,6 +8,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { getHighResImage, handleImageError, getImageClass } from './lib/imageUtils';
 import { FavoriteButton } from './components/FavoriteButton';
+import { getMockProduct } from './lib/mockData';
 import { cleanMarketData } from './lib/priceUtils';
 import { PriceTrend } from './components/PriceTrend';
 import { CardReader } from "./lib/services/cardReader";
@@ -76,13 +77,21 @@ export const ProductDetail = () => {
               card_number: productData.card_number,
               image_url: productData.image_url,
               market_data: productData.market_data || {},
-              psa_data: productData.psa_data || {},
             };
             const cleanedMarketData = cleanMarketData(product.id, product);
             setProduct({ ...product, market_data: cleanedMarketData });
             setLoading(false);
             return;
           }
+        }
+
+        // Fallback 1: Try MOCK_PRODUCTS (local static data)
+        const mockProduct = getMockProduct(id);
+        if (mockProduct) {
+          const cleanedMarketData = cleanMarketData(mockProduct.id || mockProduct.card_id, mockProduct);
+          setProduct({ ...mockProduct, market_data: cleanedMarketData });
+          setLoading(false);
+          return;
         }
 
         // Fallback: try CardReader (pokeca_gold direct)
