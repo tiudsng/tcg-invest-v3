@@ -313,3 +313,105 @@ const firestoreId = id.replace('snkdunk_', 'snkrdunk_'); // 一個字節之差
 
 ### 📊 Arch Guardian 健康度（2026-05-13）：51/100 🔴
 主要問題：JPY→HKD 匯率衝突（14+ 檔案）、腳本重疊（97.3%）。
+
+---
+
+## 🛠️ SNKRDUNK New Card Workflow（7-Phase）
+
+### 目標
+給定 `set_code + card_number`，自動完成：探索 → 設計 → 實作 → Smoke Test → 文件化 → 發布。
+
+### 技能位置
+`~/.hermes/skills/tcg-workflow/snkdunk-new-card-workflow/`
+
+### 輸入輸出 Contract
+
+**Input Schema**:
+```yaml
+set_code: string      # 例如 "SV9", "SV8a", "SM4+"
+card_number: string   # 例如 "120", "114", "119"
+snkrdunk_id: string?  # 已知則跳過 Phase 1 的 ID 探測
+dry_run: boolean=true # 預設 True，先驗證後寫入
+```
+
+**Output (trajectory.json)**:
+```json
+{
+  "workflow": "snkrdunk-new-card-workflow", "version": "1.0.0",
+  "run_id": "20260525-143022",
+  "input": {"set_code": "SV9", "card_number": "114"},
+  "phases": [
+    {"phase": 1, "name": "Analyze", "status": "success", "output": {"item_id": null, "slug": "sv9-114-100"}},
+    {"phase": 2, "name": "Design", "status": "success", "output": {"doc_id": "sv9_114_ja", "firestore_path": "pokeca_gold/sv9_114_ja"}},
+    {"phase": 5, "name": "Smoke Test", "status": "pass", "confidence": 1.0}
+  ],
+  "final_status": "success", "confidence": 1.0
+}
+```
+
+### Phase 詳細說明
+
+| Phase | 名稱 | 核心邏輯 |
+|-------|------|---------|
+| 1 | Analyze | fetch_pokeca_items() → find_card_by_number() |
+| 2 | Design | doc_id = `{slug_parts[0]}_{slug_parts[1]}_ja` |
+| 3 | Implement | 生成 card_doc（dry_run 只驗證，唔寫入） |
+| 4 | Plan Tests | 輸出 smoke_test_spec.yaml |
+| 5 | **Smoke Test** | 4-layer assertion chain，confidence ≥ 0.75 pass |
+| 6 | Document | 更新 edge_cases 到 SKILL.md |
+| 7 | Publish | trajectory.json 寫入 `/home/ubuntu/.hermes/trajectories/` |
+
+### 4-Layer Assertion Chain（Phase 5）
+
+| # | Assertion | Pass 條件 |
+|---|-----------|----------|
+| 1 | `http_200` | `strSlug` 和 `strName` 非空 |
+| 2 | `price_01_exists` | `nPriceRecent > 0 AND < 100,000,000`（0 = warning, not fail） |
+| 3 | `psa10num_reasonable` | `nPSA10Num >= 0 AND <= 1,000,000`（0 = warning, not fail） |
+| 4 | `image_url_valid` | HTTP 200, Content-Type image/*, size > 5KB |
+
+**Confidence Score**: `passed_count / 4`，≥ 0.75 算 pass。
+
+### 執行方式
+
+```bash
+# Dry-run（推薦首次）
+python3 ~/.hermes/skills/tcg-workflow/snkdunk-new-card-workflow/scripts/smoke_test_runner.py \
+  --set-code SV9 --card-number 114 --dry-run
+
+# Live run（確認 dry-run pass 後）
+python3 ~/.hermes/skills/tcg-workflow/snkdunk-new-card-workflow/scripts/smoke_test_runner.py \
+  --set-code SV9 --card-number 114 --live
+
+# 查看 trajectory
+cat ~/.hermes/trajectories/snkdunk-new-card-20260525-143022.json
+
+# 查看 test report
+cat ~/.hermes/trajectories/test_report_20260525-143022.log
+```
+
+### pokeca-chart.com API key facts
+
+- **Endpoint**: `https://pokeca-chart.com/ch/api/v1/item?limit=1`（加密）
+- **Passphrase**: `vQpUc4ej` + `YYYY-MM-DD`（JST）
+- **解密**: PBKDF2(SHA512, 100it) → AES-256-CBC
+- **返回**: dict `{card_id: card_data}`，共 735 張卡
+- **arrayPriceInfo**: 舊卡是 `dict`，新卡是 `list`
+
+### nGrdSetId → set_code mapping（動態發現）
+
+```
+nGrdSetId=123 → SV9（sv9-XXX-XXX）
+nGrdSetId=17 → SM4+（sm4plus-XXX-XXX）
+nGrdSetId=59 → s9（s9-XXX-XXX）
+```
+
+**slug 格式**: `{setcode}-{cardnum}-{rarity}`，例如 `sv9-114-100`。
+
+### 關鍵設計原則
+
+1. **dry_run: true 預設** — 避免髒數據入庫
+2. **Fail-fast on Phase 1** — item not found 直接停止
+3. **Confidence ≥ 0.75** — 4 assertions 中起碼 3 個 pass
+4. **Warning != Fail** — 剛發售卡 PSA=0 或 price=0 算 warning 但 phase pass
+5. **Trajectory 即時寫入** — crash recovery 可從 last phase 繼續
