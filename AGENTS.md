@@ -130,3 +130,186 @@ useEffect(() => {
 ```
 
 **領導 board / MOCK_PRODUCTS 只有價格數據**（`psa10_price`、`raw_price`），沒有 PSA population。
+
+---
+
+## 🔧 TCG 運維必讀（整合自 tcg-operation-menu v1.13.0）
+
+### 🔴 pokeca-chart.com API 解密（2026-05-22）
+**腳本**：`/home/ubuntu/scripts/pokeca_chart_scraper.py`
+
+| 項目 | 值 |
+|------|---|
+| Endpoint | `https://pokeca-chart.com/ch/api/v1/item?limit=1` |
+| Passphrase | `vQpUc4ej` + `YYYY-MM-DD`（JST，每日 rotate） |
+| Key derivation | PBKDF2(passphrase, SHA512, 100 iterations) |
+| Cipher | AES-256-CBC |
+| **一次返回全部 604 張卡**，無需 Tor/CVM 直連 |
+
+**兩種 arrayPriceInfo 格式（必須同時支援！）**：
+- 舊卡（如 ID 1）：`dict` `{"0": {...}, "1": {...}}` → `arrayPriceInfo["0"]["nDataNum"]`
+- 新卡（如 ID 2）：`list` `[{}, {}, {}]` → `arrayPriceInfo[0]["nDataNum"]`
+
+**同步狀態**：604 張卡已寫入 `pokeca_gold`，Cron Job 每 6 小時執行。
+
+---
+
+### 🔴 Firebase Firestore Quota 致命踩坑
+**Firestore free tier 每日 50,000 reads**。以下方式會極速燒Quota：
+
+```python
+# ❌ 錯 — 每調用一次燒 50+ reads
+for s in ['sv2a', 's12a', 'sv8a']:
+    count = sum(1 for _ in db.collection('price_history').where('set_code', '==', s).stream())
+
+# ✅ 啱 — 單 doc 讀取，每個 = 1 read
+doc = db.collection('price_history').document('sv2a_205_ja').get()
+```
+
+**原則**：
+- 配額爆掉期間**完全唔好做任何 read query**
+- 背景 writes 不受影響，但會排隊等 quota 恢復
+- 配額重置：UTC 00:00（約香港時間 08:00）
+
+---
+
+### 🔴 Vercel Deploy — CLI 成功 ≠ Deployment 成功
+**必須查 GitHub Deployment API 的 `state` 欄位**，vercel CLI / Vercel Dashboard 都可能誤導：
+
+```bash
+# 查最新 deployment state
+gh api repos/tiudsng/tcg-invest-v3/deployments --paginate | python3 -c "
+import sys,json
+for d in json.load(sys.stdin)[:2]:
+    print('sha:', d['sha'][:8], 'env:', d['environment'], 'state:')
+"
+# 然後查 state:
+gh api repos/tiudsng/tcg-invest-v3/deployments/<ID>/statuses | python3 -c "
+import sys,json
+for s in json.load(sys.stdin): print('state:', s['state'])
+"
+```
+
+**正確流程**：
+```bash
+npm run build
+vercel build --prod --yes --token <vcp_TOKEN>
+vercel deploy --prebuilt --prod --yes --token <vcp_TOKEN>
+# 然後等 60s 查 GitHub Deployment API state
+```
+
+---
+
+### 🔴 Git Rebase Conflict — 推薦模式
+```bash
+# 保存本地 independent fixes 的 diff
+git diff origin/main -- src/lib/imageUtils.ts src/ProductDetail.tsx > /tmp/my_fixes.patch
+
+# reset 到 remote（乾淨狀態）
+git reset --hard origin/main
+
+# 重新應用 diff
+git apply /tmp/my_fixes.patch && git add -A && git commit -m "fix: ..." && git push
+```
+
+---
+
+### 🔴 card_id 前綴別搞混
+| 格式 | 示例 | 用途 |
+|------|------|------|
+| URL slug | `snk**d**unk_XXXXXX`（多一個d） | URL、PriceLeaderboard card_id |
+| Firestore `snkrdunk_id` field | `snk**r**dunk_XXXXXX`（正確） | `leaderboard.snkrdunk_id` |
+
+**ProductDetail.tsx 自動轉換**：
+```typescript
+const firestoreId = id.replace('snkdunk_', 'snkrdunk_'); // 一個字節之差
+```
+
+---
+
+### 🕷️ curl_cffi 指紋池（2026-05-16 實測）
+**可用指紋**：chrome120, chrome110, chrome99, safari15_5, edge101, edge99 ✅
+**不可用**：chrome96, safari16_0, safari14_0, firefox120/115/110/102 ❌
+
+**CurlError code 對照**：
+- code 7/28 → TIMEOUT（connect fail / timeout）
+- code 35/56 → SSL_ERROR
+- code 6 → DNS resolve fail（常見 `www.snkrdunk.com` vs `snkrdunk.com`）
+
+---
+
+### 💱 JPY→HKD 標準匯率：0.0512
+**錯誤值 0.052 會造成 ~1.5% 系統性高估。**
+
+---
+
+### 📁 關鍵檔案位置（Cloud Run 環境）
+| 檔案 | 用途 |
+|------|------|
+| `/AGENTS.md` | 共享行為法則（本檔案） |
+| `/src/services/CardReader.ts` | 卡牌讀取服務 |
+| `/src/components/PriceLeaderboard.tsx` | 排行榜組件 |
+| `/src/lib/imageUtils.ts` | 圖片 URL 處理 |
+| `/server.ts` | 啟動入口 |
+
+---
+
+### 🗑️ 腳本清理（待清理）
+| 家族 | 重疊率 |
+|------|--------|
+| `scraper_pokeca.cjs` vs `v2_backup` | 97.3% |
+| `scraper_pokeca.cjs` vs `v3_proxy` | 90.3% |
+
+**未使用嘅工具**：`tcg_invest_utils.cjs` — 導出 utility functions 但**沒有任何 script 引用佢**。
+
+---
+
+### 🔧 node-cron 行為（2026-05-21 發現）
+`cron.schedule('*/5 * * * *', callback)` 在 cron job 觸發後才執行 `dispatcher.pollAndDispatch()`，但 poll 週期是每 5 分鐘一次（`14:01`、`14:05`...）。如果任務提前完成，下一個要等 5 分鐘。
+
+**緩解**：手動將任務 `kanban` 改為 `"not-started"` 可在下一個 poll 立即派發。
+
+---
+
+### 📸 imageUtils.ts Override 優先級
+`getHighResImage(url?, name?, setAndNumber?, cardId?)` — 4 參數
+`handleImageError(e, originalUrl?, name?, setAndNumber?, cardId?)` — **5 參數（v1.11.0+），有 cardId**
+
+**Override 觸發優先級**：
+1. `cardId` 完全匹配（如 `snkrdunk_93021`）
+2. `idStr` set+number 匹配（如 `s6a` + `95`）
+3. `name` 中文關鍵字匹配（如 `梵高`/`梵谷`）
+
+---
+
+### 🔴 ProductDetail URL prefix handler 矩陣
+| 前綴 | 示例 | Handler 邏輯 |
+|------|------|-------------|
+| `snkrdunk_` | `snkrdunk_107574` | `where('snkrdunk_id','==',id)` |
+| `snkdunk_` | `snkdunk_93021` | replace → `snkrdunk_` 再 query |
+| `pokeca_gold_` | `pokeca_gold_91606` | `where('snkrdunk_id','==',id)` |
+| `sm_p_` | `sm_p_001` | `where('card_id','==',id)` |
+| `s6a_` | `s6a_001` | `where('card_id','==',id)` |
+| `rank_` | `rank_02` | 直接 `doc(db,'leaderboard',id)` |
+
+---
+
+### 🕷️ SNKRDUNK JS-Rendered 數據（curl_cffi 盲點）
+`/trading-cards/{id}/used` 頁面係 JavaScript 動態渲染，curl_cffi 直接請求返回 404 或 HTML Shell。
+
+**可用數據**：base URL `/trading-cards/{id}` 返回 JSON-LD `{"price":112}`（最低報價，非分級）。
+
+**完整 grade-level listing**：需要 Puppeteer/Playwright 或 Residential Proxy。
+
+---
+
+### ⏰ Cron Job ID 參考
+| Job | Schedule | 用途 |
+|-----|----------|------|
+| `pokeca-chart daily sync` | 每 6 小時 | pokeca-chart.com bulk sync |
+| `us-equity-strategy` | 每週六 09:00 | 美股策略 |
+
+---
+
+### 📊 Arch Guardian 健康度（2026-05-13）：51/100 🔴
+主要問題：JPY→HKD 匯率衝突（14+ 檔案）、腳本重疊（97.3%）。
