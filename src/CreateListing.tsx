@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { Camera, Upload, X, ArrowRight, ArrowLeft, Image as ImageIcon, Loader2, Plus, CheckCircle2 } from 'lucide-react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebase';
 import { motion } from 'motion/react';
@@ -58,6 +58,39 @@ export const CreateListing = () => {
     setImageFiles(prev => prev.filter((_, i) => i !== index));
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
+
+  // Card Number Auto-Matching
+  React.useEffect(() => {
+    const matchCard = async () => {
+      const code = cardNumber.trim();
+      if (!code || code.length < 3) return;
+
+      try {
+        // Query Firestore products
+        const q = query(collection(db, 'products'), where('card_number', '==', code));
+        const snap = await getDocs(q);
+        
+        if (!snap.empty) {
+          const data = snap.docs[0].data();
+          if (!title) {
+            setTitle(data.name_zh || data.name || '');
+          }
+          if (!seriesCode) {
+            setSeriesCode(data.set_code || '');
+          }
+          toast.success(`已自動匹配卡牌：${data.name_zh || data.name || ''}`, {
+            description: `系列: ${data.set_code || 'N/A'} | 卡號: ${code}`,
+            duration: 3000
+          });
+        }
+      } catch (err) {
+        console.error("Match error:", err);
+      }
+    };
+
+    const timer = setTimeout(matchCard, 800);
+    return () => clearTimeout(timer);
+  }, [cardNumber]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

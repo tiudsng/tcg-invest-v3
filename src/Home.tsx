@@ -380,9 +380,15 @@ export const Home: React.FC = () => {
   }, [loading, loadingWants, isFetchingMore, isFetchingMoreWants, isFiltering, activeTab, hasMoreListings, hasMoreWants, fetchListings, fetchWants]);
 
   const filteredListings = React.useMemo(() => listings.filter(listing => {
-    const matchesSearch = (listing.title || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
-                         (listing.englishName || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
-                         (listing.description || '').toLowerCase().includes((searchQuery || '').toLowerCase());
+    const qLower = (searchQuery || '').toLowerCase().trim();
+    
+    // Only match using card number
+    let matchesSearch = true;
+    if (qLower) {
+      const cleanField = (listing.cardNumber || '').toLowerCase().replace(/[\s\-\/\(\)\[\]_]+/g, '');
+      const cleanQuery = qLower.replace(/[\s\-\/\(\)\[\]_]+/g, '');
+      matchesSearch = cleanField.includes(cleanQuery) || cleanQuery.includes(cleanField);
+    }
     
     const matchesCondition = filters.conditions.length === 0 || filters.conditions.includes(listing.condition);
     const matchesCardType = filters.cardTypes.length === 0 || (listing.cardType && filters.cardTypes.includes(listing.cardType));
@@ -395,8 +401,15 @@ export const Home: React.FC = () => {
   }), [listings, searchQuery, filters]);
 
   const filteredWantListings = React.useMemo(() => wantListings.filter(listing => {
-    const matchesSearch = (listing.title || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
-                         (listing.englishName || '').toLowerCase().includes((searchQuery || '').toLowerCase());
+    const qLower = (searchQuery || '').toLowerCase().trim();
+    
+    // Only match using card number
+    let matchesSearch = true;
+    if (qLower) {
+      const cleanField = (listing.cardNumber || '').toLowerCase().replace(/[\s\-\/\(\)\[\]_]+/g, '');
+      const cleanQuery = qLower.replace(/[\s\-\/\(\)\[\]_]+/g, '');
+      matchesSearch = cleanField.includes(cleanQuery) || cleanQuery.includes(cleanField);
+    }
     
     const matchesCondition = filters.conditions.length === 0 || filters.conditions.includes(listing.condition || 'Mint');
     const matchesCardType = filters.cardTypes.length === 0 || (listing.cardType && filters.cardTypes.includes(listing.cardType));
@@ -441,19 +454,18 @@ export const Home: React.FC = () => {
               placeholder="輸入卡號 查詢最新市價及尋找心儀卡片..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && searchQuery.trim()) {
-                  navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
-                }
-              }}
               className="block w-full pl-14 pr-6 py-4.5 bg-gray-100/80 dark:bg-white/5 border-0 rounded-[2rem] text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-white/10 transition-all shadow-sm text-base"
             />
             {searchQuery && (
               <button 
-                onClick={() => navigate(`/search?q=${encodeURIComponent(searchQuery)}`)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
+                onClick={() => {
+                  setSearchQuery('');
+                  navigate('/', { replace: true });
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-gray-200/80 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-bold active:scale-95 transition-all flex items-center gap-1"
               >
-                全站搜尋
+                <X className="w-4 h-4" />
+                <span>清除</span>
               </button>
             )}
           </div>

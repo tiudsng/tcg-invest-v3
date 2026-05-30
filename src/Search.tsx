@@ -9,6 +9,7 @@ import { getHighResImage, handleImageError, getImageClass } from './lib/imageUti
 import { ImageCarousel } from './components/ImageCarousel';
 import { ConditionBadge } from './components/ConditionBadge';
 import { cleanMarketData } from './lib/priceUtils';
+import { baselineData } from './lib/baselineData';
 
 export const Search = () => {
   const [searchParams] = useSearchParams();
@@ -29,12 +30,68 @@ export const Search = () => {
     setReportResults([]);
     
     try {
-      const searchTerms = queryStr.toLowerCase().split(/\s+/).filter(Boolean);
+      const simplifyToTraditional = (str: string) => {
+        const charMap: Record<string, string> = {
+          '喷': '噴', '龙': '龍', '梦': '夢', '闪': '閃', '宝': '寶', '可': '可',
+          '皮': '皮', '卡': '卡', '丘': '丘', '莉': '莉', '亚': '亞', '丝': '絲', '尔': '爾',
+          '宙': '宙', '斯': '斯', '超': '超', '凤': '鳳', '王': '王', '神': '神',
+          '极': '極', '巨': '巨', '饱': '飽', '战': '戰', '国': '國'
+        };
+        return str.split('').map(c => charMap[c] || c).join('');
+      };
 
       const matchesSearch = (fields: (string | undefined | null)[]) => {
         const combined = fields.filter(Boolean).join(' ').toLowerCase();
-        if (combined.includes(queryStr.toLowerCase())) return true;
-        return searchTerms.every(term => combined.includes(term));
+        const normCombined = combined.replace(/[\s\-\/\(\)\[\]_]+/g, '');
+        
+        let queryLower = queryStr.toLowerCase().trim();
+        queryLower = simplifyToTraditional(queryLower);
+        const normQuery = queryLower.replace(/[\s\-\/\(\)\[\]_]+/g, '');
+
+        // 1. Direct contains check
+        if (combined.includes(queryLower) || normCombined.includes(normQuery)) {
+          return true;
+        }
+
+        const terms = queryLower.split(/\s+/).filter(Boolean);
+        if (terms.length === 0) return false;
+
+        // Classify query terms for smarter matching
+        const numTerms = terms.filter(t => /\d+/.test(t) || t.includes('/'));
+        const wordTerms = terms.filter(t => !/\d+/.test(t) && !t.includes('/'));
+
+        // If card numbers are specified in the query, they must match the combined fields
+        if (numTerms.length > 0) {
+          const hasNumMatch = numTerms.some(nt => {
+            const rawNt = nt.replace(/[\-\/]+/g, '');
+            if (combined.includes(nt) || normCombined.includes(rawNt)) return true;
+            
+            const parts = nt.split('/');
+            if (parts[0] && parts[0].length >= 2 && normCombined.includes(parts[0])) return true;
+            return false;
+          });
+          if (!hasNumMatch) return false;
+        }
+
+        // If names/words are specified, we require all core words to be matched
+        if (wordTerms.length > 0) {
+          const isTCGenum = (t: string) => ['ex', 'gx', 'v', 'vmax', 'vstar', 'sr', 'sar', 'ar', 'ur', 'hr', 'ssr', 'promo', 'sa'].includes(t.toLowerCase());
+          const isSetCode = (t: string) => /^[a-z]{1,3}\d*[a-z]*$/i.test(t) && t.length <= 5;
+
+          const coreNameTerms = wordTerms.filter(t => !isTCGenum(t) && !isSetCode(t));
+          
+          if (coreNameTerms.length > 0) {
+            // Require all core name terms to match
+            const coreMatch = coreNameTerms.every(t => combined.includes(t) || normCombined.includes(t));
+            if (!coreMatch) return false;
+          } else {
+            // If only TCG enums exist, require at least one match
+            const termMatch = wordTerms.some(t => combined.includes(t) || normCombined.includes(t));
+            if (!termMatch) return false;
+          }
+        }
+
+        return true;
       };
 
       const listingsSnap = await getDocs(collection(db, 'listings'));
@@ -42,17 +99,133 @@ export const Search = () => {
         .map(doc => ({ id: doc.id, ...doc.data() } as Listing))
         .filter(l => matchesSearch([l.title, l.englishName, l.cardNumber, l.description, l.seriesCode]));
 
-      const allProductsSnap = await getDocs(query(collection(db, 'products'), limit(5000)));
-      const filteredProducts = allProductsSnap.docs
-        .map(doc => {
-          const data = doc.data();
-          return { 
-            id: doc.id, 
-            ...data,
-            market_data: cleanMarketData(doc.id, data)
-          } as Product;
-        })
-        .filter(p => matchesSearch([p.name, p.name_zh, p.name_jp, p.name_hk, p.card_number, p.set_name, p.set_code]));
+      // Fetch multiple collections in parallel to resolve any missing metadata
+      const [allProductsSnap, pokecaGoldSnap, newProductsSnap, leaderboardSnap] = await Promise.all([
+        getDocs(query(collection(db, 'products'), limit(5000))),
+        getDocs(collection(db, 'pokeca_gold')),
+        getDocs(collection(db, 'new_products')),
+        getDocs(collection(db, 'leaderboard'))
+      ]);
+
+      const mergedMap = new Map<string, any>();
+
+      // 1. Process pokeca_gold docs
+      pokecaGoldSnap.docs.forEach(doc => {
+        const d = doc.data();
+        const id = doc.id;
+        mergedMap.set(id, {
+          id,
+          card_id: id,
+          name: d.name || d.card_name || '',
+          name_zh: d.name_zh || d.display || d.card_name || '',
+          name_jp: d.name_jp || '',
+          name_hk: d.name_hk || '',
+          image_url: d.image_url || d.imageUrl || '',
+          card_number: d.card_number || d.cardNumber || '',
+          set_name: d.set_name || d.setName || '',
+          set_code: d.set_code || d.setCode || '',
+          market_data: d.market_data || {
+            psa10_price: d.psa10_price || d.price_usd || 0,
+            raw_price: d.raw_price || 0,
+            snkrdunk_price: d.snkrdunk_price || 0
+          }
+        });
+      });
+
+      // 2. Process new_products docs
+      newProductsSnap.docs.forEach(doc => {
+        const d = doc.data();
+        const id = doc.id;
+        mergedMap.set(id, {
+          id,
+          card_id: id,
+          name: d.name || d.card_name || '',
+          name_zh: d.name_zh || d.display || d.card_name || '',
+          name_jp: d.name_jp || '',
+          name_hk: d.name_hk || '',
+          image_url: d.image_url || d.imageUrl || '',
+          card_number: d.card_number || d.cardNumber || '',
+          set_name: d.set_name || d.setName || '',
+          set_code: d.set_code || d.setCode || '',
+          market_data: d.market_data || {
+            psa10_price: d.psa10_price || d.price_usd || 0,
+            raw_price: d.raw_price || 0,
+            snkrdunk_price: d.snkrdunk_price || 0
+          }
+        });
+      });
+
+      // 3. Process products documents (overwrite or fill)
+      allProductsSnap.docs.forEach(doc => {
+        const d = doc.data();
+        const id = doc.id;
+        const existing = mergedMap.get(id);
+
+        mergedMap.set(id, {
+          id,
+          card_id: id,
+          name: d.name || existing?.name || '',
+          name_zh: d.name_zh || d.display || existing?.name_zh || '',
+          name_jp: d.name_jp || existing?.name_jp || '',
+          name_hk: d.name_hk || existing?.name_hk || '',
+          image_url: d.image_url || d.imageUrl || existing?.image_url || '',
+          card_number: d.card_number || d.cardNumber || existing?.card_number || '',
+          set_name: d.set_name || d.setName || existing?.set_name || '',
+          set_code: d.set_code || d.setCode || existing?.set_code || '',
+          market_data: cleanMarketData(id, d)
+        });
+      });
+
+      // 4. Process leaderboard documents to merge detailed metadata
+      leaderboardSnap.docs.forEach(doc => {
+        const d = doc.data();
+        const cardId = d.card_id || d.cardId;
+        if (!cardId) return;
+
+        const existing = mergedMap.get(cardId);
+        
+        mergedMap.set(cardId, {
+          id: cardId,
+          card_id: cardId,
+          name: d.name || d.name_zh || existing?.name || '',
+          name_zh: d.name_zh || existing?.name_zh || '',
+          name_jp: d.name_jp || existing?.name_jp || '',
+          name_hk: d.name_hk || d.name_zh || existing?.name_hk || '',
+          image_url: d.image_url || d.imageUrl || existing?.image_url || '',
+          card_number: d.card_number || d.cardNumber || existing?.card_number || '',
+          set_name: d.set_name || d.setName || existing?.set_name || '',
+          set_code: d.set_code || d.setCode || existing?.set_code || '',
+          market_data: d.market_data || existing?.market_data || {}
+        });
+      });
+
+      // 5. Fallback hardcoded baselineData to guarantee top-10 are 100% searchable and accurate
+      (baselineData as any[]).forEach(item => {
+        const cardId = item.card_id;
+        if (!cardId) return;
+
+        const existing = mergedMap.get(cardId);
+        
+        mergedMap.set(cardId, {
+          id: cardId,
+          card_id: cardId,
+          name: item.name_zh || existing?.name || '',
+          name_zh: item.name_zh || existing?.name_zh || '',
+          name_jp: item.name_jp || existing?.name_jp || '',
+          name_hk: item.name_hk || existing?.name_hk || '',
+          image_url: item.image_url || existing?.image_url || '',
+          card_number: item.card_number || existing?.card_number || '',
+          set_name: item.set_name || existing?.set_name || '',
+          set_code: item.set_code || existing?.set_code || '',
+          market_data: item.market_data || existing?.market_data || {}
+        });
+      });
+
+      // Filter merged master list using advanced logic
+      const allMergedProducts = Array.from(mergedMap.values());
+      const filteredProducts = allMergedProducts.filter(p => 
+        matchesSearch([p.name, p.name_zh, p.name_jp, p.name_hk, p.card_number, p.set_name, p.set_code])
+      );
       
       setProductResults(filteredProducts);
 
