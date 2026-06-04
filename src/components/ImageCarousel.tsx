@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { getImageClass } from '../lib/imageUtils';
 
 export const ImageCarousel: React.FC<{ images: string[], title: string, id: string, showArrows?: boolean, showImageCount?: boolean }> = ({ images, title, id, showArrows = true, showImageCount = true }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -45,11 +46,11 @@ export const ImageCarousel: React.FC<{ images: string[], title: string, id: stri
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {images.map((img, i) => (
-             <div key={i} className="min-w-full h-full shrink-0 snap-center flex items-center justify-center p-0">
+             <div key={i} className="min-w-full h-full shrink-0 snap-center flex items-center justify-center p-4 sm:p-6 md:p-8">
                  <img 
                     src={img} 
                     alt={`${title} - image ${i + 1}`} 
-                    className="w-full h-full object-cover drop-shadow-2xl transition-transform duration-700 group-hover:scale-[1.05]" 
+                    className={cn(getImageClass(img), "drop-shadow-2xl transition-transform duration-700 hover:scale-[1.05]")} 
                     referrerPolicy="no-referrer"
                     loading={i === 0 ? "eager" : "lazy"}
                     onError={(e) => {

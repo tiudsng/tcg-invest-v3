@@ -6,3 +6,13 @@
     @apply bg-white dark:bg-[#121212] text-gray-900 dark:text-gray-100 transition-colors duration-300;
   }
 }
+
+/* Hide scrollbars for container with custom-scrollbar */
+.custom-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
+}

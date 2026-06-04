@@ -55,17 +55,27 @@ const FeaturedArticle = ({ article, isLarge = false, onEdit }: { article: any, i
     <div className="group relative flex flex-col sm:block w-full h-full bg-[#111111] sm:bg-[#1c1c1e] rounded-2xl sm:rounded-[1.5rem] overflow-hidden border border-gray-800 sm:border-white/5 transition-all duration-300 hover:border-white/10 shadow-lg hover:shadow-2xl hover:-translate-y-1">
       <Link to={`/article/${article.id}`} className="absolute inset-0 z-10" aria-label={`閱讀 ${article.title}`} />
       <div className={`relative w-full ${isLarge ? 'aspect-[21/9]' : 'aspect-[4/3]'} sm:aspect-auto sm:h-full sm:min-h-[200px] overflow-hidden z-0 shrink-0 ${article.imageFit === 'contain' || article.imageUrl?.includes('contain') ? 'bg-black' : ''}`}>
-        <img 
-          src={article.imageUrl} 
-          alt={article.title} 
-          className={`absolute inset-0 w-full h-full ${article.imageFit === 'contain' || article.imageUrl?.includes('contain') ? 'object-contain' : 'object-cover'} transform group-hover:scale-105 transition-transform duration-700`} 
-          referrerPolicy="no-referrer"
-          loading="lazy"
-          decoding="async"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${article.id}/800/600?blur=2`;
-          }}
-        />
+        {article.imageUrls && article.imageUrls.length > 0 ? (
+          <ImageCarousel 
+            images={article.imageUrls} 
+            title={article.title} 
+            id={article.id} 
+            showArrows={true} 
+            showImageCount={true} 
+          />
+        ) : (
+          <img 
+            src={article.imageUrl} 
+            alt={article.title} 
+            className={`absolute inset-0 w-full h-full ${article.imageFit === 'contain' || article.imageUrl?.includes('contain') ? 'object-contain' : 'object-cover'} transform group-hover:scale-105 transition-transform duration-700`} 
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            decoding="async"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${article.id}/800/600?blur=2`;
+            }}
+          />
+        )}
         <div className="hidden sm:block absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
       </div>
       <div className="p-3 sm:absolute sm:bottom-0 sm:left-0 sm:right-0 sm:p-6 z-0 pointer-events-none flex flex-col justify-start sm:justify-end flex-grow">
@@ -320,7 +330,10 @@ export const Home: React.FC = () => {
       
       const merged = [...dbArticles];
       ARTICLES.forEach(staticArt => {
-        if (!merged.find(a => a.id === staticArt.id)) {
+        const idx = merged.findIndex(a => a.id === staticArt.id);
+        if (idx !== -1) {
+          merged[idx] = { ...merged[idx], ...staticArt };
+        } else {
           merged.push(staticArt);
         }
       });
@@ -597,7 +610,7 @@ export const Home: React.FC = () => {
                 {/* 文章 1 區 (Large Slot) */}
                 <div className="lg:col-span-2 h-full">
                   {(() => {
-                    const article1 = localArticles.find(a => a.zone === 1) || localArticles[0];
+                    const article1 = localArticles.find(a => a.id === 'mega_darkrai_evolution_leak') || localArticles.find(a => a.zone === 1) || localArticles[0];
                     return article1 ? (
                       <div className="h-full">
                         <FeaturedArticle article={article1} isLarge onEdit={handleArticleEdit} />
@@ -609,7 +622,7 @@ export const Home: React.FC = () => {
                 {/* 文章 2 區 & 3 區 (Small Slots) */}
                 <div className="lg:col-span-1 grid grid-cols-2 lg:flex lg:flex-col gap-3 sm:gap-6 h-full">
                   {(() => {
-                    const article1 = localArticles.find(a => a.zone === 1) || localArticles[0];
+                    const article1 = localArticles.find(a => a.id === 'mega_darkrai_evolution_leak') || localArticles.find(a => a.zone === 1) || localArticles[0];
                     const article2 = localArticles.find(a => a.zone === 2 && a.id !== article1?.id) || localArticles.find(a => a.id !== article1?.id);
                     return article2 ? (
                       <div className="flex-1">
@@ -618,7 +631,7 @@ export const Home: React.FC = () => {
                     ) : null;
                   })()}
                   {(() => {
-                    const article1 = localArticles.find(a => a.zone === 1) || localArticles[0];
+                    const article1 = localArticles.find(a => a.id === 'mega_darkrai_evolution_leak') || localArticles.find(a => a.zone === 1) || localArticles[0];
                     const article2 = localArticles.find(a => a.zone === 2 && a.id !== article1?.id) || localArticles.find(a => a.id !== article1?.id);
                     const article3 = localArticles.find(a => a.zone === 3 && a.id !== article1?.id && a.id !== article2?.id) || localArticles.find(a => a.id !== article1?.id && a.id !== article2?.id);
                     return article3 ? (
